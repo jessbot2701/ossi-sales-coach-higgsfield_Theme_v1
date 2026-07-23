@@ -1,0 +1,19 @@
+assets
+docs
+elevenlabs
+scripts
+supabase
+tests
+playwright.config.ts
+vitest.config.ts
+
+# Local media-generation artifacts
+public/assets/hero-final.png
+public/assets/ossi-hero-kling-raw.mp4
+public/assets/ossi-login-line.mp3
+public/assets/ossi-login-spoken.mp3
+public/assets/ossi-login-spoken-v2.mp3
+public/assets/ossi-login-spoken-v3.mp3
+public/assets/ozzy-liquid-chrome.webp
+public/assets/voice-candidates
+public/voice-preview.html

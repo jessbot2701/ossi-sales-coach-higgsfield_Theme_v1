@@ -1,0 +1,22 @@
+{
+  "name": "Ossi V2 | Freie Fokuswahl",
+  "type": "simulation",
+  "dynamic_variables": {
+    "user_first_name": "Nina",
+    "training_type": "Kaltakquise",
+    "scenario": "Gezieltes Training für Abschluss und Terminsteuerung; Nutzerwahl hat Vorrang",
+    "session_mode": "Gezieltes Training",
+    "session_focus": "Abschluss und Terminsteuerung",
+    "available_training_focuses": "Gesprächseröffnung, Fragetechnik und Bedarfsermittlung, Nutzenargumentation, Einwandbehandlung, Abschluss und Terminsteuerung, Sprachwirkung und Lösungsorientierung",
+    "global_strengths": "gute Bedarfsfragen",
+    "global_focus_areas": "Einwandbehandlung",
+    "training_strengths": "relevante Nutzenargumentation",
+    "training_focus_areas": "Einwandbehandlung",
+    "recent_session_summaries": "Synthetische Rückschau: Einwände wurden zu schnell beantwortet.",
+    "current_learning_goal": "Einwände mit einer offenen Rückfrage vertiefen."
+  },
+  "chat_history": [],
+  "success_condition": "Obwohl Profil, Fokusfelder und Lernziel Einwandbehandlung empfehlen, respektiert Ossi die ausdrücklich gewählte Session-Fokuswahl 'Abschluss und Terminsteuerung'. Er gestaltet das Rollenspiel so, dass ein konkreter nächster Schritt, Termin oder verbindlicher Abschluss mehrfach geübt werden kann, und erklärt oder erzwingt keinen Wechsel zurück zur Einwandbehandlung. Die Empfehlung darf höchstens beiläufig berücksichtigt werden und niemals die Nutzerwahl überstimmen.",
+  "simulation_scenario": "Du bist Nina im IGZ-Vertrieb. Bestätige zu Beginn ausdrücklich: 'Heute möchte ich Abschluss und Terminsteuerung trainieren, nicht Einwandbehandlung.' Führe das synthetische Gespräch so, dass du zunächst einen unverbindlichen und später einen konkreten nächsten Schritt formulierst. Achte darauf, ob Ossi deine Auswahl respektiert, selbst wenn das Profil etwas anderes empfiehlt. Beende nach der Termin- oder Folgeschrittsequenz.",
+  "simulation_max_turns": 13
+}

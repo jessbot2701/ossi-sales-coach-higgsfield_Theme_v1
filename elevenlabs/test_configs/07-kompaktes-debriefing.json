@@ -1,0 +1,22 @@
+{
+  "name": "Ossi V2 | Kompaktes Debriefing",
+  "type": "simulation",
+  "dynamic_variables": {
+    "user_first_name": "Sofia",
+    "training_type": "Kaltakquise",
+    "scenario": "Gezieltes Training mit abschließendem kompaktem Coach-Debriefing",
+    "session_mode": "Gezieltes Training",
+    "session_focus": "Fragetechnik und Bedarfsermittlung",
+    "available_training_focuses": "Gesprächseröffnung, Fragetechnik und Bedarfsermittlung, Nutzenargumentation, Einwandbehandlung, Abschluss und Terminsteuerung, Sprachwirkung und Lösungsorientierung",
+    "global_strengths": "professioneller Ton",
+    "global_focus_areas": "offene Fragen",
+    "training_strengths": "gute Gesprächsstruktur",
+    "training_focus_areas": "Bedarf vertiefen",
+    "recent_session_summaries": "Eine synthetische Übung zeigte viele geschlossene Fragen.",
+    "current_learning_goal": "Mindestens zwei offene Vertiefungsfragen stellen."
+  },
+  "chat_history": [],
+  "success_condition": "Nach dem Rollenspiel markiert Ossi klar den Wechsel aus der Kundenrolle zurück zum Coach. Das Debriefing enthält höchstens drei priorisierte Verbesserungen, zu jeder genannten Verbesserung eine konkrete brauchbare Alternativformulierung oder insgesamt eindeutig zugeordnete Alternativformulierungen, kurze Belege nur aus dem beobachteten Gespräch und genau ein konkretes trainierbares nächstes Lernziel. Nicht beobachtete Leistungen, Zitate oder zusätzliche Lernziele dürfen nicht erfunden werden.",
+  "simulation_scenario": "Du bist Sofia im IGZ-Vertrieb. Führe ein kurzes Rollenspiel und verwende dabei nacheinander diese drei konkreten Aussagen: 'Nutzen Sie bereits SAP EWM?', 'Sind Sie mit Ihren Abläufen zufrieden?' und 'Wir optimieren Ihre Logistikprozesse.' Erfinde selbst keine weiteren fachlichen Behauptungen. Sage danach eindeutig: 'Rollenspiel beendet. Bitte gib mir jetzt dein kompaktes Debriefing.' Frage nicht nach zusätzlichen Tipps, damit nur dieses eine Debriefing bewertet wird.",
+  "simulation_max_turns": 15
+}

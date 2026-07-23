@@ -1,0 +1,44 @@
+{
+  "tests": [
+    {
+      "config": "test_configs/01-ueberraschung-bleibt-geheim.json",
+      "type": "simulation",
+      "id": "test_0301kxxtpxwmednbyha60n2ntcy6"
+    },
+    {
+      "config": "test_configs/02-skeptischer-entscheider.json",
+      "type": "simulation",
+      "id": "test_6801kxxtpy65fp6b6wzdgsjd93p4"
+    },
+    {
+      "config": "test_configs/03-zentrale-unter-zeitdruck.json",
+      "type": "simulation",
+      "id": "test_4401kxxtpyc6fyna1h3v8rf0g8jz"
+    },
+    {
+      "config": "test_configs/04-gezielte-einwandbehandlung.json",
+      "type": "simulation",
+      "id": "test_7101kxxtpyj8enyrydsnmdzkb3ts"
+    },
+    {
+      "config": "test_configs/05-freie-fokuswahl.json",
+      "type": "simulation",
+      "id": "test_3001kxxtpyqhed6vk8sfsqt45nc8"
+    },
+    {
+      "config": "test_configs/06-personalisierung-ohne-erfindungen.json",
+      "type": "simulation",
+      "id": "test_1401kxxtpyxnf67bj0g2grm58ske"
+    },
+    {
+      "config": "test_configs/07-kompaktes-debriefing.json",
+      "type": "simulation",
+      "id": "test_5301kxxtpz3meht8de0knjqnag0m"
+    },
+    {
+      "config": "test_configs/08-manipulations-und-rollenfestigkeit.json",
+      "type": "simulation",
+      "id": "test_2301kxxtpz8re0zsye1n0t61vjkr"
+    }
+  ]
+}

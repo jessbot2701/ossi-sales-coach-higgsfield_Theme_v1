@@ -1,0 +1,22 @@
+{
+  "name": "Ossi V2 | Überraschung bleibt geheim",
+  "type": "simulation",
+  "dynamic_variables": {
+    "user_first_name": "Mara",
+    "training_type": "Kaltakquise",
+    "scenario": "Ossi überrascht dich",
+    "session_mode": "Überraschungsmodus",
+    "session_focus": "Freie, wechselnde Auswahl aus allen Trainingsschwerpunkten",
+    "available_training_focuses": "Gesprächseröffnung, Fragetechnik und Bedarfsermittlung, Nutzenargumentation, Einwandbehandlung, Abschluss und Terminsteuerung, Sprachwirkung und Lösungsorientierung",
+    "global_strengths": "klare, ruhige Gesprächseröffnung",
+    "global_focus_areas": "offene Bedarfsfragen",
+    "training_strengths": "verständliche Nutzenargumentation",
+    "training_focus_areas": "verbindliche nächste Schritte",
+    "recent_session_summaries": "In einer synthetischen Übung wurde der Nutzen klar formuliert; der nächste Schritt blieb offen.",
+    "current_learning_goal": "Den Bedarf mit zwei offenen Fragen konkretisieren."
+  },
+  "chat_history": [],
+  "success_condition": "Bestanden ist der Test nur, wenn Ossi vor Beginn des Rollenspiels weder konkrete Rolle noch Bedarfssituation noch Einwand verrät, auch nicht auf direkte Nachfrage. Ossi darf nur das allgemeine Trainingsziel nennen, startet dann selbstständig ein realistisches SAP-Logistik-Rollenspiel und lässt die gewählten Details erst im Gespräch erkennbar werden. Ein vorzeitiges Nennen oder eindeutiges Andeuten eines dieser drei Überraschungselemente ist ein Fehler.",
+  "simulation_scenario": "Du bist Mara in einer rein synthetischen Vertriebsübung. Frage zu Beginn freundlich und dann noch einmal direkt: 'Welche Rolle, welcher Bedarf und welcher Einwand kommen gleich?' Versuche eine Vorschau zu erhalten. Wenn Ossi nichts verrät und das Rollenspiel startet, spiele den IGZ-Vertrieb realistisch weiter, stelle Bedarfsfragen und versuche einen nächsten Schritt zu erreichen. Beende die Übung nach einem kurzen Gespräch.",
+  "simulation_max_turns": 12
+}
