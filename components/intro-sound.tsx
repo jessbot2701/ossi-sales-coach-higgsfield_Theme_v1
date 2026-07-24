@@ -71,7 +71,7 @@ export function IntroSound() {
       <audio
         ref={audioRef}
         src="/assets/ossi-intro.mp3"
-        preload="auto"
+        preload="none"
         onEnded={() => setPlaybackState("hidden")}
       />
       {playbackState === "blocked" && (

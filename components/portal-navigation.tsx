@@ -13,10 +13,14 @@ export function PortalNavigation({ admin = false, showAdmin = false }: { admin?:
         { href: "/app", label: "Dashboard", exact: true },
         { href: "/admin/users", label: "Nutzer" },
         { href: "/admin/sessions", label: "Sessions" },
+        { href: "/app/so-funktionierts", label: "So funktioniert’s" },
+        { href: "/", label: "Über Ossi ↗", exact: true },
       ]
     : [
         { href: "/app", label: "Dashboard", exact: true },
         { href: "/app/training", label: "Training" },
+        { href: "/app/so-funktionierts", label: "So funktioniert’s" },
+        { href: "/", label: "Über Ossi ↗", exact: true },
         ...(showAdmin ? [{ href: "/admin/users", label: "Administration" }] : []),
       ];
 

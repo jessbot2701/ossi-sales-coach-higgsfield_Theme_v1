@@ -53,31 +53,35 @@ export async function POST(request: Request) {
       throw new ApiError(429, "Das stündliche Session-Limit ist erreicht. Bitte versuche es später erneut.", "session_rate_limited");
     }
 
-    const { data: scenario } = await supabase.from("scenarios")
-      .select("id,title,description,agent_config,is_active,training_type_id,training_type:training_types(id,name,is_active)")
-      .eq("slug", "coach_surprise").eq("training_type_id", input.trainingTypeId).maybeSingle();
+    const [{ data: scenario }, { data: versions }] = await Promise.all([
+      supabase.from("scenarios")
+        .select("id,title,description,agent_config,is_active,training_type_id,training_type:training_types(id,name,is_active)")
+        .eq("slug", "coach_surprise").eq("training_type_id", input.trainingTypeId).maybeSingle(),
+      supabase.from("training_type_versions")
+        .select("id,elevenlabs_agent_id,elevenlabs_branch_id,version_number,is_active")
+        .eq("training_type_id", input.trainingTypeId),
+    ]);
     const trainingType = Array.isArray(scenario?.training_type) ? scenario?.training_type[0] : scenario?.training_type;
     if (!scenario || !scenario.is_active || !trainingType?.is_active) throw new ApiError(404, "Das gewählte Szenario ist nicht verfügbar.", "scenario_unavailable");
 
-    const { data: version } = await supabase.from("training_type_versions")
-      .select("id,elevenlabs_agent_id,elevenlabs_branch_id,version_number")
-      .eq("training_type_id", input.trainingTypeId).eq("is_active", true).maybeSingle();
+    const version = versions?.find((item) => item.is_active);
     if (!version) throw new ApiError(409, "Für diese Trainingsart ist keine aktive Agentenversion hinterlegt.", "agent_unavailable");
+    const typeVersionIds = (versions ?? []).map((item) => item.id);
 
     const [{ data: learning }, { data: recent }, { data: profile }, { data: criteria, error: criteriaError }] = await Promise.all([
       supabase.from("learning_profiles").select("training_type_id,strengths,focus_areas,next_learning_goal").eq("user_id", user.id),
-      supabase.from("coaching_sessions").select("summary,completed_at,training_type_version_id").eq("user_id", user.id).eq("status", "completed").not("summary", "is", null).order("completed_at", { ascending: false }).limit(12),
+      supabase.from("coaching_sessions").select("summary,completed_at").eq("user_id", user.id).eq("status", "completed")
+        .in("training_type_version_id", typeVersionIds).not("summary", "is", null)
+        .order("completed_at", { ascending: false }).limit(3),
       supabase.from("profiles").select("display_name").eq("id", user.id).single(),
       supabase.from("evaluation_criteria").select("id,name,sort_order").eq("training_type_id", input.trainingTypeId).eq("is_active", true).order("sort_order"),
     ]);
     if (criteriaError || !criteria?.length) throw new ApiError(409, "Für diese Trainingsart sind keine Schwerpunkte konfiguriert.", "criteria_unavailable");
     const selectedCriterion = input.mode === "focus" ? criteria.find((criterion) => criterion.id === input.focusCriterionId) : null;
     if (input.mode === "focus" && !selectedCriterion) throw new ApiError(400, "Der gewählte Trainingsschwerpunkt ist nicht verfügbar.", "invalid_focus");
-    const { data: typeVersions } = await supabase.from("training_type_versions").select("id").eq("training_type_id", input.trainingTypeId);
-    const typeVersionIds = new Set((typeVersions ?? []).map((item) => item.id));
     const globalProfile = (learning ?? []).find((item) => item.training_type_id === null);
     const typeProfile = (learning ?? []).find((item) => item.training_type_id === input.trainingTypeId);
-    const recentSummaries = (recent ?? []).filter((item) => typeVersionIds.has(item.training_type_version_id)).slice(0, 3).map((item) => item.summary).join(" | ");
+    const recentSummaries = (recent ?? []).map((item) => item.summary).join(" | ");
 
     const dynamicVariables: DynamicVariables = {
       user_first_name: (profile?.display_name || user.displayName).trim().split(/\s+/)[0],

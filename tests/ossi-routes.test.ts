@@ -8,7 +8,6 @@ const source = (path: string) =>
 describe("Ossi route adoption", () => {
   it("uses the shared Ossi heading on protected content pages", () => {
     for (const path of [
-      "app/app/page.tsx",
       "app/app/training/page.tsx",
       "app/app/sessions/[id]/page.tsx",
       "app/admin/users/page.tsx",
@@ -16,6 +15,13 @@ describe("Ossi route adoption", () => {
     ]) {
       expect(source(path)).toContain("<PortalHeading");
     }
+  });
+
+  it("uses the dedicated Ossi dashboard hero", () => {
+    const dashboard = source("app/app/page.tsx");
+
+    expect(dashboard).toContain('className="dashboard-hero"');
+    expect(dashboard).toContain('<OssiPortrait variant="heading"');
   });
 
   it("shows Ossi on both authentication pages", () => {

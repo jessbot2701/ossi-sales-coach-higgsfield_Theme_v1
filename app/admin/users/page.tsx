@@ -1,8 +1,10 @@
 import { AdminUsers, type AdminUserRow } from "@/components/admin-users";
 import { PortalHeading } from "@/components/portal-heading";
+import { requirePageUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export default async function AdminUsersPage() {
+  await requirePageUser({ admin: true });
   const supabase = createAdminClient();
   const [{ data: authData }, { data: profiles }, { data: roles }] = await Promise.all([
     supabase.auth.admin.listUsers({ page: 1, perPage: 1000 }),

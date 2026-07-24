@@ -3,10 +3,15 @@ import { Brand } from "@/components/brand";
 import { IntroSound } from "@/components/intro-sound";
 import { LandingClient } from "@/components/landing-client";
 import { OssiPortrait } from "@/components/ossi-portrait";
+import { getUserContext } from "@/lib/auth";
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const user = await getUserContext();
+  const hasPortalAccess = Boolean(user?.isActive);
+
   return (
     <>
+      <div className="site-grain" aria-hidden="true" />
       <IntroSound />
       <a className="skip-link" href="#main">Zum Inhalt springen</a>
 
@@ -15,7 +20,9 @@ export default function LandingPage() {
         <nav aria-label="Hauptnavigation">
           <a href="#how">So funktioniert&apos;s</a>
           <a href="#about">Über Ossi</a>
-          <Link className="nav-cta" href="/login">Anmelden</Link>
+          <Link className="nav-cta" href={hasPortalAccess ? "/app" : "/login"}>
+            {hasPortalAccess ? "Zum Dashboard" : "Anmelden"}
+          </Link>
         </nav>
       </header>
 
@@ -35,6 +42,11 @@ export default function LandingPage() {
                   poster="/assets/hero-final.webp"
                   disablePictureInPicture
                 >
+                  <source
+                    src="/assets/ossi-hero-mobile.mp4"
+                    type="video/mp4"
+                    media="(max-width: 760px)"
+                  />
                   <source src="/assets/ossi-hero.mp4" type="video/mp4" />
                 </video>
               </div>
@@ -52,16 +64,20 @@ export default function LandingPage() {
               <p className="eyebrow reveal-item">KI-gestütztes Vertriebstraining</p>
               <h1 id="hero-title" className="reveal-item">
                 Meet Ossi.<br />
-                <em>The Prince of<br />Cold Calls.</em>
+                <em>
+                  <span className="hero-title-line">The Prince of</span>
+                  <span className="hero-title-line">Sales Calls.</span>
+                </em>
               </h1>
               <p className="hero-intro reveal-item">
                 Dein persönlicher KI-Vertriebscoach für professionelle
-                B2B-Kaltakquise im <strong>SAP-Umfeld.</strong>
+                B2B-Vertriebsgespräche im SAP-Umfeld.
               </p>
               <p className="hero-detail reveal-item">
-                Trainiere Gesprächseinstieg, Nutzenargumentation und
-                Terminsteuerung in realistischen Telefongesprächen – mit
-                messbarem Lernfortschritt.
+                Trainiere Gesprächseinstieg, Bedarfsermittlung,
+                Nutzenargumentation, Einwandbehandlung und Abschluss in
+                realistischen Voice-Sessions – mit nachvollziehbarem Feedback
+                und messbarem Fortschritt.
               </p>
               <div className="hero-actions reveal-item">
                 <Link className="button button-primary" href="/app/training">
@@ -84,11 +100,26 @@ export default function LandingPage() {
                 Sessions sind nur nach Anmeldung und aktiver Zustimmung zur
                 zwölfmonatigen Transkriptspeicherung verfügbar.
               </p>
-              <Link href="/login">Sicher anmelden <span aria-hidden="true">↗</span></Link>
+              <Link href={hasPortalAccess ? "/app" : "/login"}>
+                {hasPortalAccess ? "Zum Dashboard" : "Sicher anmelden"} <span aria-hidden="true">↗</span>
+              </Link>
             </aside>
 
             <p className="hero-side-note" aria-hidden="true">SIGNAL / STRUKTUR / WIRKUNG</p>
             <div className="scroll-cue" aria-hidden="true"><span>Scroll</span><i /></div>
+          </div>
+        </section>
+
+        <section className="release-note" aria-labelledby="release-note-title">
+          <div className="section-shell release-note-inner" data-reveal>
+            <h2 id="release-note-title">
+              Release 1 <span>· Kaltakquise</span>
+            </h2>
+            <p>
+              Zum Start trainierst du mit Ossi professionelle Kaltakquise und
+              Terminanbahnung. Weitere Gesprächsformate werden schrittweise
+              ergänzt.
+            </p>
           </div>
         </section>
 
@@ -166,7 +197,7 @@ export default function LandingPage() {
             <div className="method-heading">
               <p className="section-kicker" data-reveal>Dein Coach</p>
               <h2 id="about-title" data-reveal>
-                Kaltakquise<br />ohne <span>Lampenfieber.</span>
+                Sales Calls<br /><span>mit Wirkung.</span>
               </h2>
             </div>
             <div className="about-copy">

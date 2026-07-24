@@ -61,4 +61,28 @@ describe("Ossi theme", () => {
       /@media \(max-width: 480px\)[\s\S]*\.portal-heading-actions \{ padding-bottom: 78px; \}[\s\S]*\.page-actions \{ flex-direction: row; flex-wrap: wrap; gap: 8px; \}/,
     );
   });
+
+  it("keeps competency score values separate from their charts", () => {
+    const dashboard = source("app/app/page.tsx");
+    const appStyles = source("app/app.css");
+
+    expect(dashboard).toContain('className="competency-score-summary"');
+    expect(dashboard).toContain('className="competency-score-value"');
+    expect(appStyles).toContain(
+      ".competency-score-area { display: grid; grid-template-columns:",
+    );
+    expect(appStyles).not.toContain(".competency-score-ring > div");
+  });
+
+  it("uses the dashboard score language on individual session results", () => {
+    const session = source("app/app/sessions/[id]/page.tsx");
+    const appStyles = source("app/app.css");
+
+    expect(session).toContain('className="portal-card full session-meta-card"');
+    expect(session).toContain("Unter 1 Minute");
+    expect(session).toContain("<SessionScoreRing");
+    expect(session).toContain('className="session-score-value"');
+    expect(appStyles).toContain(".session-score-overview { display: grid;");
+    expect(appStyles).toContain(".session-score-ring svg");
+  });
 });

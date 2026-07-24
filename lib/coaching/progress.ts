@@ -2,6 +2,8 @@ import type { CompetencyAggregate, ScoreEntry, Trend } from "@/types/domain";
 
 const round = (value: number) => Math.round(value * 100) / 100;
 const average = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
+export const STRENGTH_MIN_RATINGS = 3;
+export const STRENGTH_MIN_AVERAGE_SCORE = 4;
 
 function trendFor(scoresNewestFirst: number[]): Trend {
   if (scoresNewestFirst.length < 6) return "insufficient_data";
@@ -36,7 +38,7 @@ export function aggregateCompetencyProgress(entries: ScoreEntry[]): CompetencyAg
 export function deriveLearningProfile(aggregates: CompetencyAggregate[], explicitGoal?: string | null) {
   const ranked = [...aggregates].sort((a, b) => a.latestScore - b.latestScore || a.averageScore - b.averageScore);
   const strengths = aggregates
-    .filter((item) => item.sessionCount >= 3 && item.averageScore >= 4)
+    .filter((item) => item.sessionCount >= STRENGTH_MIN_RATINGS && item.averageScore >= STRENGTH_MIN_AVERAGE_SCORE)
     .sort((a, b) => b.averageScore - a.averageScore)
     .map((item) => item.competencyName);
   const focusAreas = ranked.slice(0, 2).map((item) => item.competencyName);

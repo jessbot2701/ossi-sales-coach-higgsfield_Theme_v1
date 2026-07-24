@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { PortalHeading } from "@/components/portal-heading";
+import { requirePageUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const statusLabel: Record<string, string> = { created: "Vorbereitet", active: "Aktiv", processing: "Auswertung", completed: "Abgeschlossen", failed: "Fehlgeschlagen" };
 
 export default async function AdminSessionsPage() {
+  await requirePageUser({ admin: true });
   const supabase = createAdminClient();
   const [{ data: sessions }, { data: authData }] = await Promise.all([
     supabase.from("coaching_sessions").select("id,user_id,title,status,created_at,duration_seconds,summary").order("created_at", { ascending: false }).limit(200),

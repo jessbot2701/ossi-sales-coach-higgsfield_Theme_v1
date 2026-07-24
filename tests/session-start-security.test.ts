@@ -31,4 +31,10 @@ describe("session start protection", () => {
     expect(route).toContain("CREATED_SESSION_TIMEOUT_MS = 15 * 60 * 1000");
     expect(route).toContain("ACTIVE_SESSION_TIMEOUT_MS = 4 * 60 * 60 * 1000");
   });
+
+  it("loads all training versions once and scopes history in the database", () => {
+    expect(route).toContain("const [{ data: scenario }, { data: versions }] = await Promise.all");
+    expect(route).toContain('.in("training_type_version_id", typeVersionIds)');
+    expect(route.match(/from\("training_type_versions"\)/g)).toHaveLength(1);
+  });
 });

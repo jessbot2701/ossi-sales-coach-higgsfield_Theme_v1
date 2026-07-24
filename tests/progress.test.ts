@@ -18,4 +18,12 @@ describe("learning progress", () => {
     expect(profile.focusAreas).toEqual(["Abschluss", "Fragen"]);
     expect(profile.nextLearningGoal).toContain("Abschluss");
   });
+
+  it("does not call a high score a stable strength before three ratings", () => {
+    const profile = deriveLearningProfile([
+      { competencyId: "a", competencyName: "Sprache", sessionCount: 2, averageScore: 4.8, latestScore: 5, trend: "insufficient_data" },
+    ]);
+
+    expect(profile.strengths).toEqual([]);
+  });
 });

@@ -1,10 +1,12 @@
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { apiErrorResponse, ApiError } from "@/lib/api";
+import { validateCriterionEvaluations } from "@/lib/coaching/evaluation-integrity";
 import { recomputeLearningProfiles } from "@/lib/coaching/recompute";
 import { extractPostCallAnalysis } from "@/lib/elevenlabs/analysis";
 import { verifyElevenLabsSignature } from "@/lib/elevenlabs/signature";
 import { requireServerEnv } from "@/lib/env";
+import { readTextBodyWithLimit } from "@/lib/request-body";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type EventData = {
@@ -15,23 +17,31 @@ type EventData = {
   metadata?: Record<string, unknown>;
 };
 
+const MAX_WEBHOOK_BODY_BYTES = 1_000_000;
+const MAX_TRANSCRIPT_TURNS = 500;
+const MAX_TRANSCRIPT_MESSAGE_CHARS = 20_000;
+
 function cleanTranscript(value: unknown) {
   if (!Array.isArray(value)) return [];
-  return value.flatMap((turn) => {
+  return value.slice(0, MAX_TRANSCRIPT_TURNS).flatMap((turn) => {
     if (!turn || typeof turn !== "object") return [];
     const item = turn as Record<string, unknown>;
     const role = item.role === "user" ? "user" : item.role === "agent" ? "agent" : null;
     const message = typeof item.message === "string" ? item.message : typeof item.text === "string" ? item.text : null;
-    return role && message ? [{ role, message, time_in_call_secs: Number(item.time_in_call_secs) || null }] : [];
+    return role && message ? [{
+      role,
+      message: message.slice(0, MAX_TRANSCRIPT_MESSAGE_CHARS),
+      time_in_call_secs: Number(item.time_in_call_secs) || null,
+    }] : [];
   });
 }
 
 export async function POST(request: Request) {
-  const rawBody = await request.text();
   let conversationId: string | undefined;
   let receiptClaimed = false;
   const supabase = createAdminClient();
   try {
+    const rawBody = await readTextBodyWithLimit(request, MAX_WEBHOOK_BODY_BYTES);
     const secret = requireServerEnv("ELEVENLABS_WEBHOOK_SECRET");
     if (!verifyElevenLabsSignature(rawBody, request.headers.get("elevenlabs-signature"), secret)) {
       throw new ApiError(401, "Ungültige Webhook-Signatur.", "invalid_signature");
@@ -78,17 +88,17 @@ export async function POST(request: Request) {
     const { data: criteria, error: criteriaError } = await supabase.from("evaluation_criteria")
       .select("id,slug,name,sort_order").eq("training_type_id", version.training_type_id).eq("is_active", true).order("sort_order");
     if (criteriaError || !criteria?.length) throw new Error("No evaluation criteria configured");
-    const evaluations = criteria.map((criterion) => {
+    const evaluations = validateCriterionEvaluations(criteria.map((criterion) => {
       const slug = criterion.slug as keyof typeof extracted.scores;
       return {
         session_id: session.id,
         criterion_id: criterion.id,
         score: extracted.scores[slug] ?? null,
-        reasoning: extracted.feedback[slug] ?? extracted.improvements,
-        evidence: extracted.criterionEvidence[slug] ?? extracted.evidence,
+        reasoning: extracted.feedback[slug],
+        evidence: extracted.criterionEvidence[slug],
         recommendation: extracted.nextLearningGoal,
       };
-    });
+    }), transcript);
     const { error: evaluationsError } = await supabase.from("session_evaluations").upsert(evaluations, { onConflict: "session_id,criterion_id" });
     if (evaluationsError) throw evaluationsError;
 

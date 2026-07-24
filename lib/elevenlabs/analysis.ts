@@ -8,6 +8,7 @@ const SCORE_KEYS = [
 ] as const;
 
 type UnknownRecord = Record<string, unknown>;
+const MAX_ANALYSIS_TEXT_CHARS = 20_000;
 
 function record(value: unknown): UnknownRecord {
   return value && typeof value === "object" && !Array.isArray(value) ? value as UnknownRecord : {};
@@ -28,7 +29,9 @@ export function extractPostCallAnalysis(analysisValue: unknown) {
 
   const text = (key: string) => {
     const value = collectedValue(collection, key);
-    return typeof value === "string" && value.trim() ? value.trim() : null;
+    return typeof value === "string" && value.trim()
+      ? value.trim().slice(0, MAX_ANALYSIS_TEXT_CHARS)
+      : null;
   };
 
   const criterionText = (suffix: "feedback" | "evidence") => Object.fromEntries(
@@ -39,7 +42,11 @@ export function extractPostCallAnalysis(analysisValue: unknown) {
     scores,
     feedback: criterionText("feedback"),
     criterionEvidence: criterionText("evidence"),
-    summary: text("summary") ?? (typeof analysis.transcript_summary === "string" ? analysis.transcript_summary : null),
+    summary: text("summary") ?? (
+      typeof analysis.transcript_summary === "string"
+        ? analysis.transcript_summary.trim().slice(0, MAX_ANALYSIS_TEXT_CHARS)
+        : null
+    ),
     strengths: text("strengths"),
     improvements: text("improvements"),
     evidence: text("evidence"),
