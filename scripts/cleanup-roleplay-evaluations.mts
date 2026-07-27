@@ -8,6 +8,9 @@ type EvaluationRow = {
   reasoning: string | null;
   evidence: string | null;
   recommendation: string | null;
+  alternative_formulation: string | null;
+  improvement_evidence: string | null;
+  improvement_priority: number | null;
 };
 
 type SessionRow = {
@@ -59,7 +62,10 @@ function sameEvaluation(left: EvaluationRow, right: EvaluationRow) {
   return left.score === right.score
     && left.reasoning === right.reasoning
     && left.evidence === right.evidence
-    && left.recommendation === right.recommendation;
+    && left.recommendation === right.recommendation
+    && left.alternative_formulation === right.alternative_formulation
+    && left.improvement_evidence === right.improvement_evidence
+    && left.improvement_priority === right.improvement_priority;
 }
 
 async function loadCompletedSessions() {
@@ -69,7 +75,7 @@ async function loadCompletedSessions() {
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await supabase
       .from("coaching_sessions")
-      .select("id,user_id,training_type_version_id,completed_at,transcript,session_evaluations(criterion_id,score,reasoning,evidence,recommendation)")
+      .select("id,user_id,training_type_version_id,completed_at,transcript,session_evaluations(criterion_id,score,reasoning,evidence,recommendation,alternative_formulation,improvement_evidence,improvement_priority)")
       .eq("status", "completed")
       .not("transcript", "is", null)
       .order("created_at", { ascending: true })
@@ -261,18 +267,13 @@ for (const session of sessions) {
     evaluation.reasoning,
     evaluation.evidence,
     evaluation.recommendation,
+    evaluation.improvement_evidence,
   ]).filter((value) => (
     typeof value === "string"
     && /ich bin bereit|hört sich besser an|ciao[\s,]+ossi/iu.test(value)
   )).length;
   const validated = validateCriterionEvaluations(evaluations, transcript, phaseAnalysis);
-  const hasInvalidEvaluation = validated.some((evaluation, index) => (
-    !sameEvaluation(evaluations[index], evaluation as EvaluationRow)
-  ));
-  const sanitized = validated.map((evaluation) => ({
-    ...(evaluation as EvaluationRow),
-    recommendation: hasInvalidEvaluation ? null : evaluation.recommendation ?? null,
-  }));
+  const sanitized = validated as EvaluationRow[];
   const changes = sanitized.filter((evaluation, index) => (
     !sameEvaluation(evaluations[index], evaluation)
   ));
@@ -297,6 +298,9 @@ for (const session of sessions) {
           reasoning: evaluation.reasoning,
           evidence: evaluation.evidence,
           recommendation: evaluation.recommendation,
+          alternative_formulation: evaluation.alternative_formulation,
+          improvement_evidence: evaluation.improvement_evidence,
+          improvement_priority: evaluation.improvement_priority,
         })
         .eq("session_id", session.id)
         .eq("criterion_id", evaluation.criterion_id);

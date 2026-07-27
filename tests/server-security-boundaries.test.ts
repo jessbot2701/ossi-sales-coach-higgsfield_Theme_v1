@@ -37,6 +37,12 @@ describe("server security boundaries", () => {
     const webhook = source("app/api/webhooks/elevenlabs/route.ts");
     expect(webhook).toContain("reasoning: extracted.feedback[slug]");
     expect(webhook).toContain("evidence: extracted.criterionEvidence[slug]");
+    expect(webhook).toContain("recommendation: extracted.improvementsByCriterion[slug]");
+    expect(webhook).toContain("alternative_formulation: extracted.alternativesByCriterion[slug]");
+    expect(webhook).toContain("improvement_evidence: extracted.improvementEvidenceByCriterion[slug]");
+    expect(webhook).toContain("improvement_priority: extracted.improvementPriorities[slug]");
+    expect(webhook).toContain("strengths: sanitizeSessionStrengths");
+    expect(webhook).toContain("next_learning_goal: acceptedLearningGoal");
     expect(webhook).toContain("validateCriterionEvaluations");
     expect(webhook).not.toContain("extracted.feedback[slug] ?? extracted.improvements");
     expect(webhook).not.toContain("extracted.criterionEvidence[slug] ?? extracted.evidence");

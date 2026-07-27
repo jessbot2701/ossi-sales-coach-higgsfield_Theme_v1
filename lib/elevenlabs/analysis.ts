@@ -38,10 +38,46 @@ export function extractPostCallAnalysis(analysisValue: unknown) {
     SCORE_KEYS.map((key) => [key, text(`${key}_${suffix}`)]),
   ) as Record<(typeof SCORE_KEYS)[number], string | null>;
 
+  const criterionImprovements = Object.fromEntries(SCORE_KEYS.map((key) => {
+    const raw = collectedValue(collection, `${key}_improvement`);
+    let improvement = record(raw);
+    if (typeof raw === "string") {
+      try {
+        improvement = record(JSON.parse(raw.replace(/^```(?:json)?\s*|\s*```$/gi, "")));
+      } catch {
+        improvement = {};
+      }
+    }
+    const improvementText = (field: "improvement" | "alternative" | "evidence") => {
+      const value = improvement[field];
+      return typeof value === "string" && value.trim()
+        ? value.trim().slice(0, MAX_ANALYSIS_TEXT_CHARS)
+        : null;
+    };
+    const numericPriority = Number(improvement.priority);
+    return [key, {
+      improvement: improvementText("improvement"),
+      alternative: improvementText("alternative"),
+      evidence: improvementText("evidence"),
+      priority: Number.isInteger(numericPriority) && numericPriority >= 1 && numericPriority <= 3
+        ? numericPriority
+        : null,
+    }];
+  })) as Record<(typeof SCORE_KEYS)[number], {
+    improvement: string | null;
+    alternative: string | null;
+    evidence: string | null;
+    priority: number | null;
+  }>;
+
   return {
     scores,
     feedback: criterionText("feedback"),
     criterionEvidence: criterionText("evidence"),
+    improvementsByCriterion: Object.fromEntries(SCORE_KEYS.map((key) => [key, criterionImprovements[key].improvement])),
+    alternativesByCriterion: Object.fromEntries(SCORE_KEYS.map((key) => [key, criterionImprovements[key].alternative])),
+    improvementEvidenceByCriterion: Object.fromEntries(SCORE_KEYS.map((key) => [key, criterionImprovements[key].evidence])),
+    improvementPriorities: Object.fromEntries(SCORE_KEYS.map((key) => [key, criterionImprovements[key].priority])),
     summary: text("summary") ?? (
       typeof analysis.transcript_summary === "string"
         ? analysis.transcript_summary.trim().slice(0, MAX_ANALYSIS_TEXT_CHARS)

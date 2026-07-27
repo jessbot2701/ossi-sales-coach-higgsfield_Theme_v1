@@ -1,7 +1,10 @@
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { apiErrorResponse, ApiError } from "@/lib/api";
-import { validateCriterionEvaluations } from "@/lib/coaching/evaluation-integrity";
+import {
+  sanitizeSessionStrengths,
+  validateCriterionEvaluations,
+} from "@/lib/coaching/evaluation-integrity";
 import { recomputeLearningProfiles } from "@/lib/coaching/recompute";
 import { analyzeTranscriptPhases } from "@/lib/coaching/transcript-phases";
 import { extractPostCallAnalysis } from "@/lib/elevenlabs/analysis";
@@ -98,7 +101,10 @@ export async function POST(request: Request) {
         score: extracted.scores[slug] ?? null,
         reasoning: extracted.feedback[slug],
         evidence: extracted.criterionEvidence[slug],
-        recommendation: extracted.nextLearningGoal,
+        recommendation: extracted.improvementsByCriterion[slug],
+        alternative_formulation: extracted.alternativesByCriterion[slug],
+        improvement_evidence: extracted.improvementEvidenceByCriterion[slug],
+        improvement_priority: extracted.improvementPriorities[slug],
       };
     }), transcript, phaseAnalysis);
     const acceptedLearningGoal = phaseAnalysis.status === "recognized"
@@ -113,6 +119,8 @@ export async function POST(request: Request) {
       duration_seconds: Number.isFinite(duration) && duration >= 0 ? Math.round(duration) : null,
       title: typeof snapshot.title === "string" ? snapshot.title : "Voice-Coaching",
       summary: extracted.summary,
+      strengths: sanitizeSessionStrengths(extracted.strengths, phaseAnalysis),
+      next_learning_goal: acceptedLearningGoal,
       transcript,
       completed_at: completedAt,
       expires_at: new Date(new Date(completedAt).setFullYear(new Date(completedAt).getFullYear() + 1)).toISOString(),

@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 
 const migration = readFileSync(join(process.cwd(), "supabase/migrations/20260719210605_init_coaching_platform.sql"), "utf8");
 const activeAccessMigration = readFileSync(join(process.cwd(), "supabase/migrations/20260720082724_enforce_active_user_access.sql"), "utf8");
+const improvementsMigration = readFileSync(join(process.cwd(), "supabase/migrations/20260727144417_add_category_improvements.sql"), "utf8");
+const sessionGoalMigration = readFileSync(join(process.cwd(), "supabase/migrations/20260727151317_add_session_learning_goal.sql"), "utf8");
 
 describe("database security contract", () => {
   it("enables RLS on every exposed application table", () => {
@@ -28,6 +30,18 @@ describe("database security contract", () => {
   it("uses a private, payload-free webhook receipt table", () => {
     expect(migration).toContain("create table private.webhook_receipts");
     expect(migration).not.toMatch(/create table private\.webhook_receipts[\s\S]*?payload jsonb[\s\S]*?;/i);
+  });
+
+  it("enforces complete, ranked category improvements and session strengths", () => {
+    for (const column of ["alternative_formulation", "improvement_evidence", "improvement_priority"]) {
+      expect(improvementsMigration).toContain(`add column ${column}`);
+    }
+    expect(improvementsMigration).toContain("session_evaluations_improvement_complete");
+    expect(improvementsMigration).toContain("session_evaluations_improvement_priority_idx");
+    expect(improvementsMigration).toContain("set recommendation = null");
+    expect(improvementsMigration).toContain("add column strengths jsonb");
+    expect(improvementsMigration).toContain("jsonb_array_length(strengths) <= 3");
+    expect(sessionGoalMigration).toContain("add column next_learning_goal text");
   });
 
   it("seeds an agent-selected surprise scenario", () => {

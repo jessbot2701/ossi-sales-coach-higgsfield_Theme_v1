@@ -364,14 +364,14 @@ async function waitForWebhook(sessionId) {
   for (let attempt = 0; attempt < 60; attempt += 1) {
     const { data: session, error } = await admin
       .from("coaching_sessions")
-      .select("status,summary,transcript,processing_error")
+      .select("status,summary,strengths,transcript,processing_error")
       .eq("id", sessionId)
       .single();
     if (error) throw error;
     if (session.status === "completed") {
       const { data: evaluations, error: evaluationError } = await admin
         .from("session_evaluations")
-        .select("score,reasoning,evidence")
+        .select("score,reasoning,evidence,recommendation,alternative_formulation,improvement_evidence,improvement_priority")
         .eq("session_id", sessionId);
       if (evaluationError) throw evaluationError;
       return { session, evaluations: evaluations ?? [] };
@@ -405,6 +405,14 @@ function verifyStoredResult(testCase, webhook) {
       .map((turn) => turn.message)
       .join(" "),
   );
+  const improvements = webhook.evaluations.filter((evaluation) => (
+    evaluation.recommendation !== null
+    || evaluation.alternative_formulation !== null
+    || evaluation.improvement_evidence !== null
+    || evaluation.improvement_priority !== null
+  ));
+  if (improvements.length > 3) throw new Error(`Mehr als drei Verbesserungshebel gespeichert: ${improvements.length}.`);
+  const priorities = new Set();
   for (const evaluation of webhook.evaluations) {
     if (evaluation.score !== null && (!Number.isInteger(evaluation.score) || evaluation.score < 1 || evaluation.score > 5)) {
       throw new Error(`Ungültiger Score ${evaluation.score}.`);
@@ -416,12 +424,34 @@ function verifyStoredResult(testCase, webhook) {
     if (evidence && !roleplayUserText.includes(evidence) && !evidence.includes(roleplayUserText)) {
       throw new Error(`Beleg stammt nicht erkennbar aus dem Rollenspiel: ${evaluation.evidence}`);
     }
+    const improvementFields = [
+      evaluation.recommendation,
+      evaluation.alternative_formulation,
+      evaluation.improvement_evidence,
+      evaluation.improvement_priority,
+    ];
+    const populatedImprovementFields = improvementFields.filter((value) => value !== null).length;
+    if (populatedImprovementFields !== 0 && populatedImprovementFields !== improvementFields.length) {
+      throw new Error("Unvollständiger Verbesserungshebel gespeichert.");
+    }
+    if (populatedImprovementFields === improvementFields.length) {
+      if (!Number.isInteger(evaluation.improvement_priority) || evaluation.improvement_priority < 1 || evaluation.improvement_priority > 3) {
+        throw new Error(`Ungültige Verbesserungspriorität ${evaluation.improvement_priority}.`);
+      }
+      if (priorities.has(evaluation.improvement_priority)) throw new Error("Doppelte Verbesserungspriorität gespeichert.");
+      priorities.add(evaluation.improvement_priority);
+      const improvementEvidence = normalize(evaluation.improvement_evidence);
+      if (!roleplayUserText.includes(improvementEvidence) && !improvementEvidence.includes(roleplayUserText)) {
+        throw new Error(`Verbesserungsbeleg stammt nicht aus dem Rollenspiel: ${evaluation.improvement_evidence}`);
+      }
+    }
   }
   return {
     transcriptTurns: transcript.length,
     evaluations: webhook.evaluations.length,
     scoredCriteria: webhook.evaluations.filter((item) => item.score !== null).length,
     evidenceCriteria: webhook.evaluations.filter((item) => item.evidence?.trim()).length,
+    improvements: improvements.length,
     roleplayUserTurns: transcript.slice(startIndex + 1, endIndex).filter((turn) => turn.role === "user").length,
   };
 }

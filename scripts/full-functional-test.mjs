@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
+import { fileURLToPath } from "node:url";
 import { chromium } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 
@@ -72,7 +73,10 @@ async function createUser(email, password, displayName, role = "user") {
   return data.user.id;
 }
 
-async function createCompletedSession(userId, title) {
+async function createCompletedSession(userId, title, {
+  improvementCount = 1,
+  strengths = ["Ruhiger Gesprächseinstieg", "Klare Sprache"],
+} = {}) {
   const completedAt = new Date().toISOString();
   const transcript = [
     { role: "agent", message: "Willkommen zum Training." },
@@ -83,7 +87,7 @@ async function createCompletedSession(userId, title) {
     { role: "agent", message: "Rollenspiel beendet – zurück im Coach-Modus." },
     { role: "user", message: "Danke für das Feedback." },
   ];
-  const { data: session, error } = await admin.from("coaching_sessions").insert({
+  const sessionValues = {
     user_id: userId,
     training_type_version_id: trainingTypeVersionId,
     scenario_id: scenarioId,
@@ -95,10 +99,13 @@ async function createCompletedSession(userId, title) {
     duration_seconds: 95,
     title,
     summary: "Funktionstest mit klar erkannten Rollenspielphasen.",
+    ...(strengths === null ? {} : { strengths }),
+    next_learning_goal: "Fragetechnik weiter trainieren",
     transcript,
     started_at: completedAt,
     completed_at: completedAt,
-  }).select("id").single();
+  };
+  const { data: session, error } = await admin.from("coaching_sessions").insert(sessionValues).select("id").single();
   if (error || !session) throw error ?? new Error("Testsession konnte nicht erstellt werden.");
   cleanupSessionIds.add(session.id);
 
@@ -119,7 +126,14 @@ async function createCompletedSession(userId, title) {
       evidence: index === 0
         ? "Guten Tag, hier ist der Vertrieb von IGZ."
         : "Wie organisieren Sie aktuell Ihre SAP-Lagerprozesse?",
-      recommendation: index === 0 ? "Fragetechnik weiter trainieren" : null,
+      recommendation: index < improvementCount ? `Verbesserungshebel ${index + 1} konkreter umsetzen.` : null,
+      alternative_formulation: index < improvementCount ? `Alternative Formulierung ${index + 1} für das Kundengespräch.` : null,
+      improvement_evidence: index < improvementCount
+        ? (index === 0
+          ? "Guten Tag, hier ist der Vertrieb von IGZ."
+          : "Wie organisieren Sie aktuell Ihre SAP-Lagerprozesse?")
+        : null,
+      improvement_priority: index < improvementCount ? index + 1 : null,
     })),
   );
   if (evaluationError) throw evaluationError;
@@ -185,6 +199,9 @@ async function countRows(table, column, value) {
 let normalUserId;
 let ownSessionId;
 let retainedSessionId;
+let zeroImprovementSessionId;
+let threeImprovementSessionId;
+let legacySessionId;
 let cascadeUserId;
 let cascadeSessionId;
 let existingSessionId;
@@ -214,6 +231,12 @@ try {
 
   normalUserId = await createUser(normalEmail, normalPassword, "Codex Functional User");
   ownSessionId = await createCompletedSession(normalUserId, "Codex E2E Löschtest");
+  zeroImprovementSessionId = await createCompletedSession(normalUserId, "Codex E2E ohne Hebel", { improvementCount: 0 });
+  threeImprovementSessionId = await createCompletedSession(normalUserId, "Codex E2E drei Hebel", { improvementCount: 3 });
+  legacySessionId = await createCompletedSession(normalUserId, "Codex E2E alte Session", {
+    improvementCount: 0,
+    strengths: null,
+  });
   retainedSessionId = await createCompletedSession(normalUserId, "Codex E2E Restbestand");
 
   await check("UI-01", "Öffentliche Landingpage lädt vollständig", async () => {
@@ -326,6 +349,53 @@ try {
       assert(await normalPage.getByText(label, { exact: true }).count() >= 1, `${label} fehlt.`);
     }
     assert(await normalPage.getByText("Ossi / Kundenrolle", { exact: true }).count() >= 1, "Kundenrollenlabel fehlt.");
+  });
+
+  await check("SESSION-02", "Coaching-Fazit zeigt null, einen, drei und alte Sessions korrekt", async () => {
+    const variants = [
+      { id: zeroImprovementSessionId, expected: 0 },
+      { id: ownSessionId, expected: 1 },
+      { id: threeImprovementSessionId, expected: 3 },
+      { id: legacySessionId, expected: 0 },
+    ];
+    for (const variant of variants) {
+      await normalPage.goto(`${baseUrl}/app/sessions/${variant.id}`);
+      await normalPage.getByRole("heading", { name: "Das nimmst du aus der Session mit" }).waitFor();
+      assert(
+        await normalPage.locator(".category-improvement").count() === variant.expected,
+        `Erwartet ${variant.expected} Verbesserungen für ${variant.id}.`,
+      );
+      assert(
+        await normalPage.locator(".conclusion-improvements li").count() === variant.expected,
+        `Übersicht und Karten weichen für ${variant.id} ab.`,
+      );
+    }
+    return { variants: variants.map(({ expected }) => expected) };
+  });
+
+  await check("SESSION-03", "Session-Fazit bleibt auf Desktop, Tablet und Mobile responsiv", async () => {
+    const viewports = [
+      { name: "desktop", width: 1440, height: 1000 },
+      { name: "tablet", width: 768, height: 1024 },
+      { name: "mobile", width: 390, height: 844 },
+    ];
+    const screenshotsUrl = new URL("../artifacts/visual-qa/", import.meta.url);
+    await mkdir(screenshotsUrl, { recursive: true });
+    for (const viewport of viewports) {
+      await normalPage.setViewportSize(viewport);
+      await normalPage.goto(`${baseUrl}/app/sessions/${threeImprovementSessionId}`);
+      await normalPage.getByRole("heading", { name: "Das nimmst du aus der Session mit" }).waitFor();
+      const dimensions = await normalPage.evaluate(() => ({
+        clientWidth: document.documentElement.clientWidth,
+        scrollWidth: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth),
+      }));
+      assert(dimensions.scrollWidth <= dimensions.clientWidth, `${viewport.name}: ${JSON.stringify(dimensions)}`);
+      await normalPage.screenshot({
+        path: fileURLToPath(new URL(`session-improvements-${viewport.name}.png`, screenshotsUrl)),
+        fullPage: true,
+      });
+    }
+    return { viewports };
   });
 
   await check("RLS-02", "Fremde Session ist für normalen Nutzer nicht lesbar", async () => {

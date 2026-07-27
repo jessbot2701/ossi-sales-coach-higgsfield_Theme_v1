@@ -19,8 +19,10 @@ describe("isolated V2 agent configuration", () => {
       expect(collection[key].type).toBe("integer");
       expect(collection[`${key}_feedback`].type).toBe("string");
       expect(collection[`${key}_evidence`].type).toBe("string");
+      expect(collection[`${key}_improvement`].type).toBe("string");
     }
-    for (const key of ["summary", "strengths", "improvements", "evidence", "next_learning_goal"]) expect(collection[key].type).toBe("string");
+    for (const key of ["summary", "strengths", "next_learning_goal"]) expect(collection[key].type).toBe("string");
+    expect(Object.keys(collection).length).toBeLessThanOrEqual(40);
   });
 
   it("limits every evaluation field and learning goal to the marked roleplay", () => {
@@ -30,12 +32,25 @@ describe("isolated V2 agent configuration", () => {
       key,
       `${key}_feedback`,
       `${key}_evidence`,
-    ]).concat(["strengths", "improvements", "evidence", "next_learning_goal"]);
+      `${key}_improvement`,
+    ]).concat(["strengths", "next_learning_goal"]);
 
     for (const field of restrictedFields) {
       expect(collection[field].description).toContain("Rollenspielphase");
       expect(collection[field].description).toContain("Coach-Intro");
       expect(collection[field].description).toContain("leer lassen");
+    }
+  });
+
+  it("limits category improvements to the three most important evidenced levers", () => {
+    const collection = config.platform_settings.data_collection;
+    const scoreKeys = ["conversation_opening", "needs_discovery", "value_proposition", "objection_handling", "closing", "language_impact"];
+    for (const key of scoreKeys) {
+      expect(collection[`${key}_improvement`].description).toContain("höchstens drei wichtigsten Hebeln");
+      expect(collection[`${key}_improvement`].description).toContain("Alternativformulierung");
+      expect(collection[`${key}_improvement`].description).toContain("wörtliche Nutzeraussage");
+      expect(collection[`${key}_improvement`].description).toContain("Priorität ist eindeutig 1, 2 oder 3");
+      expect(collection[`${key}_improvement`].description).toContain("JSON-Objekt mit allen Feldern");
     }
   });
 
@@ -89,6 +104,8 @@ describe("isolated V2 agent configuration", () => {
     expect(prompt).toContain("Im Modus „Gezieltes Training“");
     expect(prompt).toContain("Verrate diese Auswahl vorher nicht");
     expect(prompt).toContain("Lernprofil sowie letzte Sessions");
+    expect(prompt).toContain("eine konkrete Rolle oder Persona, ist sie bindend");
+    expect(prompt).toContain("ausschließlich diesen Entscheider und niemals Zentrale, Empfang oder Assistenz");
   });
 
   it("does not concede after weak objection handling", () => {
