@@ -10,7 +10,11 @@ const evaluation = (overrides: Partial<{ score: number | null; reasoning: string
 
 const transcript = [
   { role: "agent", message: "Hallo, ich bin Ossi. Heute trainieren wir Kaltakquise. Bist du bereit?" },
+  { role: "user", message: "Ich bin bereit." },
+  { role: "agent", message: "Rollenspiel beginnt." },
   { role: "user", message: "Guten Tag, mein Name ist Weiß. Ich rufe wegen Ihrer Lagerprozesse an." },
+  { role: "agent", message: "Danke. Rollenspiel beendet – zurück im Coach-Modus." },
+  { role: "user", message: "Das hört sich besser an. Ciao, Ossi." },
 ];
 
 describe("criterion evaluation integrity", () => {
@@ -21,6 +25,18 @@ describe("criterion evaluation integrity", () => {
   it("rejects evidence taken from an agent turn", () => {
     const result = validateCriterionEvaluations([
       evaluation({ evidence: "Hallo, ich bin Ossi. Heute trainieren wir Kaltakquise." }),
+    ], transcript)[0];
+
+    expect(result).toMatchObject({ score: null, reasoning: null, evidence: null });
+  });
+
+  it.each([
+    "Ich bin bereit.",
+    "Das hört sich besser an.",
+    "Ciao, Ossi.",
+  ])("rejects coach-dialog evidence outside the roleplay: %s", (evidence) => {
+    const result = validateCriterionEvaluations([
+      evaluation({ evidence }),
     ], transcript)[0];
 
     expect(result).toMatchObject({ score: null, reasoning: null, evidence: null });
@@ -50,5 +66,22 @@ describe("criterion evaluation integrity", () => {
     ], transcript)[0];
 
     expect(result.score).toBe(4);
+  });
+
+  it("marks every criterion unrated when no safe roleplay boundaries exist", () => {
+    const result = validateCriterionEvaluations([evaluation()], [
+      { role: "user", message: evaluation().evidence as string },
+    ])[0];
+
+    expect(result).toMatchObject({ score: null, reasoning: null, evidence: null });
+  });
+
+  it("removes the learning recommendation with an invalid criterion", () => {
+    const result = validateCriterionEvaluations([{
+      ...evaluation({ evidence: "Ich bin bereit." }),
+      recommendation: "Gesprächseröffnung weiter trainieren.",
+    }], transcript)[0];
+
+    expect(result.recommendation).toBeNull();
   });
 });

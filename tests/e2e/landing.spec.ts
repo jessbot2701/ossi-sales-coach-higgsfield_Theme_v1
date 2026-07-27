@@ -43,6 +43,9 @@ async function expectNoArtificialAuthPageHeight(page: Page) {
 
 test("preserves the public Ossi visual identity", async ({ page }) => {
   const browserErrors: string[] = [];
+  await page.addInitScript(() => {
+    window.sessionStorage.setItem("ossi-intro-sound-played-v1", "true");
+  });
   page.on("console", (message) => {
     if (message.type() === "error") browserErrors.push(message.text());
   });

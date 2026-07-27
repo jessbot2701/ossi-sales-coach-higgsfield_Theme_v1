@@ -49,7 +49,7 @@ describe("server security boundaries", () => {
     expect(config).toContain("Strict-Transport-Security");
   });
 
-  it("keeps personal portal queries scoped to the signed-in user even for admins", () => {
+  it("keeps personal dashboard data scoped while allowing explicit admin session audits", () => {
     const dashboard = source("app/app/page.tsx");
     const training = source("app/app/training/page.tsx");
     const session = source("app/app/sessions/[id]/page.tsx");
@@ -58,7 +58,39 @@ describe("server security boundaries", () => {
     expect(training).toContain("requirePageUser()");
     expect(training).toContain('.eq("user_id", user.id)');
     expect(session).toContain("requirePageUser()");
-    expect(session.match(/\.eq\("user_id", user\.id\)/g)).toHaveLength(2);
+    expect(session).toContain('if (user.role !== "admin")');
+    expect(session).toContain('sessionQuery.eq("user_id", user.id)');
+    expect(session).toContain("Administrativer Nur-Lese-Zugriff");
+  });
+
+  it("recomputes derived learning data after a session is deleted", () => {
+    const route = source("app/api/sessions/[id]/route.ts");
+    expect(route).toContain("recomputeLearningProfiles");
+    expect(route.indexOf('.delete().eq("id", id)')).toBeLessThan(
+      route.indexOf("await recomputeLearningProfiles"),
+    );
+  });
+
+  it("defers active-user checks on protected pages to the cached page authorization", () => {
+    const proxy = source("proxy.ts");
+    const auth = source("lib/auth.ts");
+    const protectedGuard = proxy.indexOf("if (protectedPath && !isAuthenticated)");
+    const profileLookup = proxy.indexOf('.select("is_active")');
+
+    expect(protectedGuard).toBeGreaterThanOrEqual(0);
+    expect(profileLookup).toBeGreaterThan(protectedGuard);
+    expect(proxy).toContain('select("is_active")');
+    expect(auth).toContain('if (!user.isActive) redirect("/login?error=inactive")');
+  });
+
+  it("recomputes progress without loading transcripts or issuing per-competency upserts", () => {
+    const recompute = source("lib/coaching/recompute.ts");
+
+    expect(recompute).toContain("session:coaching_sessions!inner");
+    expect(recompute).not.toContain("transcript");
+    expect(recompute).not.toContain("analyzeTranscriptPhases");
+    expect(recompute).toContain(".upsert(progressRows");
+    expect(recompute).toContain(".upsert(profileRows");
   });
 
   it("scopes dashboard evidence through an inner session join and explains scores on demand", () => {

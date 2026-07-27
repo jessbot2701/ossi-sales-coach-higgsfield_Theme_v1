@@ -1,12 +1,14 @@
-type TranscriptTurn = {
-  role?: string;
-  message?: string;
-};
+import {
+  analyzeTranscriptPhases,
+  type TranscriptPhaseAnalysis,
+  type TranscriptTurn,
+} from "./transcript-phases.ts";
 
 type CriterionEvaluation = {
   score: number | null;
   reasoning: string | null;
   evidence: string | null;
+  recommendation?: string | null;
 };
 
 function normalized(value: string) {
@@ -30,8 +32,9 @@ function comparableMatch(candidate: string, source: string) {
 export function validateCriterionEvaluations<T extends CriterionEvaluation>(
   evaluations: T[],
   transcript: TranscriptTurn[],
+  phaseAnalysis: TranscriptPhaseAnalysis = analyzeTranscriptPhases(transcript),
 ) {
-  const userMessages = transcript.filter((turn) => turn.role === "user" && turn.message).map((turn) => turn.message as string);
+  const userMessages = phaseAnalysis.roleplayUserMessages;
   const agentMessages = transcript.filter((turn) => turn.role === "agent" && turn.message).map((turn) => turn.message as string);
   const reasoningFrequency = new Map<string, number>();
 
@@ -42,6 +45,16 @@ export function validateCriterionEvaluations<T extends CriterionEvaluation>(
   }
 
   return evaluations.map((evaluation) => {
+    if (phaseAnalysis.status !== "recognized") {
+      return {
+        ...evaluation,
+        score: null,
+        reasoning: null,
+        evidence: null,
+        ...("recommendation" in evaluation ? { recommendation: null } : {}),
+      };
+    }
+
     const validScore = evaluation.score !== null
       && Number.isInteger(evaluation.score)
       && evaluation.score >= 1
@@ -54,6 +67,12 @@ export function validateCriterionEvaluations<T extends CriterionEvaluation>(
       && userMessages.some((message) => comparableMatch(evaluation.evidence as string, message));
 
     if (validScore && hasSpecificReasoning && hasUserEvidence) return evaluation;
-    return { ...evaluation, score: null, reasoning: null, evidence: null };
+    return {
+      ...evaluation,
+      score: null,
+      reasoning: null,
+      evidence: null,
+      ...("recommendation" in evaluation ? { recommendation: null } : {}),
+    };
   });
 }
