@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { HowItWorksPhone } from "@/components/how-it-works-phone";
 import { PortalHeading } from "@/components/portal-heading";
 
 export const metadata: Metadata = { title: "So funktioniert’s" };
@@ -21,6 +22,7 @@ export default function HowItWorksPage() {
         eyebrow="Hilfe & Orientierung"
         title="So funktioniert dein Training."
         description="Ossi simuliert ein realistisches Vertriebsgespräch, wertet deine Aussagen aus und macht deinen Fortschritt über mehrere Sessions sichtbar."
+        visual={<HowItWorksPhone />}
         actions={
           <div className="page-actions">
             <Link className="button button-primary" href="/app/training">
