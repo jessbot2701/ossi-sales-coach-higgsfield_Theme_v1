@@ -57,6 +57,9 @@ function Launcher({ trainingTypes, criteria, learningProfiles, consentVersion, i
   const recommendation = recommendedCriterion(filteredCriteria, learningProfiles, trainingTypeId);
   const typeProfile = learningProfiles.find((profile) => profile.training_type_id === trainingTypeId)
     ?? learningProfiles.find((profile) => profile.training_type_id === null);
+  const voiceState = status === "connecting" ? "connecting" : status === "connected" ? "connected" : "ready";
+  const selectedFocus = filteredCriteria.find((criterion) => criterion.id === focusCriterionId)?.name
+    ?? "deinen gewählten Schwerpunkt";
 
   function changeTrainingType(nextTypeId: string) {
     const nextCriteria = criteria.filter((criterion) => criterion.training_type_id === nextTypeId);
@@ -103,7 +106,7 @@ function Launcher({ trainingTypes, criteria, learningProfiles, consentVersion, i
 
   return (
     <div className="portal-grid training-grid">
-      <section className="portal-card training-config"><span className="card-label-app">Vorbereitung</span><h2>Training konfigurieren</h2><form className="form-stack" onSubmit={submit}>
+      <section className="portal-card training-config"><span className="card-label-app">Vorbereitung</span><h2>Training konfigurieren</h2><form id="training-config-form" className="form-stack" onSubmit={submit}>
         <fieldset className="training-type-field"><legend>Trainingsart</legend><div className="training-type-grid">
           {trainingTypes.map((type) => {
             const descriptionId = `training-type-${type.id}-description`;
@@ -123,18 +126,55 @@ function Launcher({ trainingTypes, criteria, learningProfiles, consentVersion, i
           <p id="transcript-consent-status" className="consent-status" aria-live="polite">{consent ? "Einwilligung erteilt – die Voice-Session kann gestartet werden." : "Ohne Einwilligung kann keine Voice-Session gestartet werden."}</p>
         </div>
         {error && <p className="form-message error" role="alert">{error}</p>}{message && <p className="form-message" role="status">{message}</p>}
-        {status === "connected" ? <button className="button button-danger" type="button" onClick={() => endSession()}>Gespräch beenden</button> : <button className="button button-primary" type="submit" disabled={!consent || preparing || !filteredCriteria.length || (mode === "focus" && !focusCriterionId)}>{preparing || status === "connecting" ? "Verbindung wird aufgebaut …" : "Voice-Training starten"}</button>}
-        {sessionId && status === "disconnected" && <Link href={`/app/sessions/${sessionId}`}>Zur Session-Auswertung →</Link>}
       </form></section>
-      <aside className="voice-session portal-card">
-        <div className="voice-portrait">
-          <OssiPortrait variant="session" decorative />
+      <aside className="voice-session portal-card" aria-label="Voice-Phone">
+        <div className={`voice-phone ${voiceState}`}>
+          <span className="voice-phone-side voice-phone-side-volume" aria-hidden="true" />
+          <span className="voice-phone-side voice-phone-side-power" aria-hidden="true" />
+          <div className="voice-phone-screen">
+            <div className="voice-phone-statusbar" aria-hidden="true">
+              <span>09:41</span>
+              <span className="voice-phone-signal"><i /><i /><i /></span>
+            </div>
+            <span className="voice-phone-island" aria-hidden="true" />
+            <div className="voice-portrait">
+              <OssiPortrait variant="session" decorative />
+            </div>
+            <div className="voice-session-shade" aria-hidden="true" />
+            <div className="voice-phone-header">
+              <p className="eyebrow light"><span /> Voice Session</p>
+              <div className={`voice-status ${voiceState}`} role="status"><i aria-hidden="true" /> {status === "connected" ? "Live" : status === "connecting" ? "Verbindung" : "Bereit"}</div>
+            </div>
+            <div className="voice-copy">
+              <h2>Ossi ist {status === "connected" ? "im Gespräch" : status === "connecting" ? "gleich da" : "bereit"}.</h2>
+              <p>{mode === "surprise" ? "Ossi gestaltet ein unerwartetes, anspruchsvolles Gespräch und sorgt über mehrere Sessions für Abwechslung." : `Ossi richtet das Gespräch auf ${selectedFocus} aus. Rolle, Situation und Einwände bleiben überraschend.`}</p>
+            </div>
+            <div className="sound-bars" aria-hidden="true">{Array.from({ length: 12 }, (_, index) => <i key={index} />)}</div>
+            <div className="voice-phone-controls">
+              {status === "connected" ? (
+                <button className="voice-call-button hangup" type="button" onClick={() => endSession()} aria-label="Gespräch beenden">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 10.8c3.5-1.7 7.3-1.7 10.8 0l1.6.8c.7.4 1 1.2.7 2l-.8 2.1c-.3.7-1 1.1-1.8.9l-2.5-.7a1.5 1.5 0 0 1-1.1-1.4v-.8a11.8 11.8 0 0 0-3 0v.8c0 .7-.5 1.3-1.1 1.4l-2.5.7c-.7.2-1.5-.2-1.8-.9l-.8-2.1c-.3-.8 0-1.6.7-2l1.6-.8Z" /></svg>
+                </button>
+              ) : (
+                <button
+                  className="voice-call-button start"
+                  type="submit"
+                  form="training-config-form"
+                  disabled={!consent || preparing || !filteredCriteria.length || (mode === "focus" && !focusCriterionId)}
+                  aria-label="Voice-Training starten"
+                  aria-busy={preparing || status === "connecting"}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.1 3.3 9.6 3c.7-.1 1.4.4 1.6 1.1l.8 3.1c.2.7-.1 1.4-.7 1.8l-1.7 1a14.8 14.8 0 0 0 4.4 4.4l1-1.7c.4-.6 1.1-.9 1.8-.7l3.1.8c.7.2 1.2.9 1.1 1.6l-.3 2.5c-.1.9-.8 1.6-1.7 1.7C11.6 19.4 4.6 12.4 5.4 5c.1-.9.8-1.6 1.7-1.7Z" /></svg>
+                </button>
+              )}
+              <strong>{status === "connected" ? "Gespräch beenden" : preparing || status === "connecting" ? "Ossi wird angerufen …" : "Ossi anrufen"}</strong>
+              <small>{status === "connected" ? "Die Auswertung startet danach automatisch." : consent ? "Mikrofon und Voice-Session starten" : "Zuerst links der Speicherung zustimmen"}</small>
+            </div>
+            {sessionId && status === "disconnected" && <Link className="voice-session-link" href={`/app/sessions/${sessionId}`}>Zur Session-Auswertung →</Link>}
+            <span className="voice-phone-home" aria-hidden="true" />
+          </div>
         </div>
-        <div className="voice-session-shade" aria-hidden="true" />
-        <p className="eyebrow light"><span /> Voice Session</p>
-        <div className={`voice-status ${status === "connecting" ? "connecting" : status === "connected" ? "connected" : "ready"}`} role="status"><i aria-hidden="true" /> {status === "connected" ? "Live" : status === "connecting" ? "Verbindung" : "Bereit"}</div>
-        <div className="voice-copy"><h2>Ossi ist {status === "connected" ? "im Gespräch" : status === "connecting" ? "gleich da" : "bereit"}.</h2><p>{mode === "surprise" ? "Ossi gestaltet ein unerwartetes, anspruchsvolles Gespräch und sorgt über mehrere Sessions für Abwechslung." : `Ossi richtet das Gespräch auf ${filteredCriteria.find((criterion) => criterion.id === focusCriterionId)?.name ?? "deinen gewählten Schwerpunkt"} aus. Rolle, Situation und Einwände bleiben überraschend.`}</p></div>
-        <div className="sound-bars" aria-hidden="true">{Array.from({ length: 12 }, (_, index) => <i key={index} />)}</div>
+        <p className="voice-phone-note">Konfiguration wählen, Einwilligung geben und Ossi direkt im Phone anrufen.</p>
       </aside>
     </div>
   );

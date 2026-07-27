@@ -31,8 +31,23 @@ describe("training launcher UI", () => {
     expect(styles).toMatch(/\.voice-status\.connecting i \{[^}]*#f1bd58/);
   });
 
-  it("stacks the training layout and preserves the portrait on narrow screens", () => {
+  it("places the functional start and stop controls inside the voice phone", () => {
+    expect(launcher).toContain('id="training-config-form"');
+    expect(launcher).toContain('className={`voice-phone ');
+    expect(launcher).toContain('form="training-config-form"');
+    expect(launcher).toContain('aria-label="Voice-Training starten"');
+    expect(launcher).toContain('aria-label="Gespräch beenden"');
+    expect(launcher).toContain('fetch("/api/sessions/start"');
+    expect(launcher).toContain("startSession({");
+    expect(launcher).toContain("onConnect: async ({ conversationId })");
+    expect(launcher).toContain("onClick={() => endSession()}");
+    expect(styles).toContain(".voice-phone {");
+    expect(styles).toContain(".voice-call-button");
+  });
+
+  it("stacks the training layout and keeps the phone usable on narrow screens", () => {
     expect(styles).toMatch(/@media \(max-width: 960px\)[\s\S]*\.training-config,\s*\.voice-session \{ grid-column: 1 \/ -1; \}/);
-    expect(styles).toMatch(/@media \(max-width: 480px\)[\s\S]*\.voice-portrait \{ width: 90%; height: 76%; \}/);
+    expect(styles).toMatch(/@media \(max-width: 480px\)[\s\S]*\.voice-phone \{[^}]*width: min\(100%, 340px\)/);
+    expect(styles).toMatch(/@media \(max-width: 480px\)[\s\S]*\.voice-portrait \{[^}]*height: 70%/);
   });
 });
