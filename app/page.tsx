@@ -5,6 +5,21 @@ import { LandingClient } from "@/components/landing-client";
 import { OssiPortrait } from "@/components/ossi-portrait";
 import { getUserContext } from "@/lib/auth";
 
+const evaluationCriteria = [
+  "Gesprächseröffnung",
+  "Fragetechnik und Bedarfsermittlung",
+  "Nutzenargumentation",
+  "Einwandbehandlung",
+  "Abschluss und Terminsteuerung",
+  "Sprachwirkung und Lösungsorientierung",
+] as const;
+
+const scenarioExamples = [
+  "Offener Entscheider",
+  "Skeptischer SAP-Leiter",
+  "Zentrale unter Zeitdruck",
+] as const;
+
 export default async function LandingPage() {
   const user = await getUserContext();
   const hasPortalAccess = Boolean(user?.isActive);
@@ -150,6 +165,12 @@ export default async function LandingPage() {
                   Wähle eine konkrete Gesprächssituation – oder lass dich
                   standardmäßig von Ossi überraschen.
                 </p>
+                <div className="case-examples">
+                  <p>Beispiele:</p>
+                  <ul aria-label="Beispielszenarien">
+                    {scenarioExamples.map((scenario) => <li key={scenario}>{scenario}</li>)}
+                  </ul>
+                </div>
               </div>
               <div className="case-signal" aria-hidden="true"><i /><i /><i /></div>
             </article>
@@ -176,12 +197,34 @@ export default async function LandingPage() {
                 <p className="case-label">Auswerten</p>
                 <h3>Gezielt<br />verbessern.</h3>
                 <p>
-                  Erhalte sechs nachvollziehbare Bewertungen, Belegstellen und
-                  einen konkreten nächsten Lernfokus.
+                  Erhalte Bewertungen in sechs klaren Kompetenzfeldern,
+                  konkrete Belegstellen und einen nächsten Lernfokus.
                 </p>
               </div>
               <div className="case-line" aria-hidden="true"><span /></div>
             </article>
+          </div>
+
+          <div
+            className="section-shell evaluation-panel"
+            data-reveal
+            aria-labelledby="evaluation-title"
+          >
+            <div className="prompt-heading evaluation-heading">
+              <div>
+                <p className="section-kicker">Sechs Bewertungskriterien</p>
+                <h3 id="evaluation-title">Darauf achtet Ossi.</h3>
+              </div>
+              <p>1–5 Punkte · nur wenn beobachtbar</p>
+            </div>
+            <ol className="evaluation-list">
+              {evaluationCriteria.map((criterion, index) => (
+                <li key={criterion}>
+                  <span aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
+                  {criterion}
+                </li>
+              ))}
+            </ol>
           </div>
 
           <div className="section-shell prompt-panel" data-reveal>
