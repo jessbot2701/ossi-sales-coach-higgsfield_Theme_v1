@@ -81,96 +81,42 @@
   place-items: center;
   pointer-events: none;
 }
-.portal-heading-custom-visual { min-height: 260px; }
-.help-phone-visual { width: 194px; height: 258px; transform: rotate(1.5deg); transform-origin: center; }
-.help-phone {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  padding: 7px;
-  border: 1px solid rgba(190, 226, 249, .38);
-  border-radius: 25px;
-  background: linear-gradient(145deg, #203a4d, #061522 58%, #17364c);
-  box-shadow: 0 22px 42px rgba(0, 8, 15, .48), inset 0 0 0 1px rgba(255, 255, 255, .05);
-}
-.help-phone::after {
-  content: "";
+.portal-heading-custom-visual { min-height: 320px; }
+.help-phone-visual { position: relative; width: 196px; height: 396px; }
+.help-phone-visual .help-phone-preview {
   position: absolute;
-  inset: 2px;
-  border: 1px solid rgba(255, 255, 255, .08);
-  border-radius: 22px;
-}
-.help-phone-sensor {
-  position: absolute;
-  z-index: 4;
-  top: 11px;
+  top: 0;
   left: 50%;
-  width: 40px;
-  height: 4px;
-  border-radius: 999px;
-  background: rgba(1, 8, 13, .92);
-  transform: translateX(-50%);
+  width: 350px;
+  transform: translateX(-50%) scale(.55);
+  transform-origin: top center;
 }
-.help-phone-screen {
-  position: relative;
-  display: flex;
-  height: 100%;
-  padding: 21px 9px 10px;
-  overflow: hidden;
-  border: 1px solid rgba(102, 189, 243, .15);
-  border-radius: 19px;
-  align-items: center;
-  flex-direction: column;
-  background:
-    radial-gradient(circle at 50% 38%, rgba(34, 158, 233, .3), transparent 45%),
-    linear-gradient(180deg, #0b2c43, #04131f);
-}
-.help-phone-status {
-  display: inline-flex;
-  margin-bottom: 1px;
-  align-items: center;
-  gap: 4px;
-  color: #b9ddf3;
-  font-size: 7px;
-  font-weight: 750;
-  letter-spacing: .12em;
-  line-height: 1;
-  text-transform: uppercase;
-}
-.help-phone-status > span {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: #64dc9b;
-  box-shadow: 0 0 8px rgba(100, 220, 155, .7);
-}
-.help-phone-portrait { position: relative; width: 120px; height: 108px; margin-top: 1px; }
-.portal-heading .help-phone-portrait .ossi-portrait {
+.portal-heading .help-phone-preview .ossi-portrait {
   position: relative;
   inset: auto;
   width: 100%;
   height: 100%;
   opacity: 1;
 }
-.portal-heading .help-phone-portrait .ossi-portrait-image {
-  object-position: 72% center;
-  filter: saturate(.92) contrast(1.06) drop-shadow(0 8px 12px rgba(0, 8, 15, .34));
+.help-phone-preview .voice-phone-header .eyebrow { color: var(--blue-soft); }
+.help-phone-preview .sound-bars {
+  position: absolute;
+  z-index: 6;
+  right: 30px;
+  bottom: 148px;
+  left: 30px;
+  display: flex;
+  height: 26px;
+  align-items: end;
+  justify-content: center;
+  gap: 5px;
+  opacity: .38;
 }
-.portal-heading .help-phone-portrait .ossi-portrait-halo { inset: 22% 1% 3%; filter: blur(7px); }
-.help-phone-name { margin-top: -3px; color: #f2f8fc; font-family: var(--display); font-size: 18px; font-weight: 650; line-height: 1; text-transform: uppercase; }
-.help-phone-caption { margin-top: 4px; color: #88acc3; font-size: 7.5px; line-height: 1; }
-.help-phone-call {
-  display: grid;
-  width: 34px;
-  height: 34px;
-  margin-top: 9px;
-  border-radius: 50%;
-  place-items: center;
-  color: #052014;
-  background: #64dc9b;
-  box-shadow: 0 7px 16px rgba(0, 8, 15, .35), 0 0 0 4px rgba(100, 220, 155, .08);
-}
-.help-phone-call svg { width: 16px; height: 16px; fill: currentColor; }
+.help-phone-preview .sound-bars i { width: 3px; height: 24%; border-radius: 999px; background: #8ed0f8; }
+.help-phone-preview .sound-bars i:nth-child(3n + 1) { height: 45%; }
+.help-phone-preview .sound-bars i:nth-child(4n + 2) { height: 75%; }
+.help-phone-preview .sound-bars i:nth-child(5n + 3) { height: 100%; }
+.help-phone-preview .voice-call-button { cursor: default; }
 .portal-heading-actions { padding-bottom: 72px; }
 .portal-heading-actions .page-actions { position: absolute; z-index: 3; left: 0; bottom: 24px; }
 .page-actions { display: flex; flex-wrap: wrap; gap: 10px; }
@@ -899,9 +845,10 @@ td small { color: var(--muted); }
 @media (max-width: 960px) {
   .portal-heading { min-height: 215px; padding-right: 245px; }
   .portal-heading .ossi-portrait { right: -4px; width: 230px; height: 250px; }
-  .portal-heading-custom-visual { min-height: 250px; }
-  .portal-heading-visual { right: 5px; width: 224px; height: 246px; }
-  .help-phone-visual { width: 184px; height: 244px; }
+  .portal-heading-custom-visual { min-height: 310px; }
+  .portal-heading-visual { right: 5px; width: 224px; height: 366px; }
+  .help-phone-visual { width: 180px; height: 365px; }
+  .help-phone-visual .help-phone-preview { transform: translateX(-50%) scale(.51); }
   .portal-card.third { grid-column: span 6; }
   .action-card { grid-column: 1 / -1; min-height: 140px; }
   .dashboard-hero { grid-template-columns: minmax(0, 1fr) 230px; padding: 36px; }
@@ -951,22 +898,10 @@ td small { color: var(--muted); }
   .portal-heading-actions .ossi-portrait-heading,
   .portal-heading-actions .ossi-portrait-session { top: 18px; bottom: auto; height: 128px; }
   .portal-heading .ossi-portrait-halo { inset: 25% 0 7%; }
-  .portal-heading-custom-visual { min-height: 236px; padding-right: 126px; }
-  .portal-heading-visual { top: 8px; right: -2px; width: 124px; height: 160px; }
-  .help-phone-visual { width: 106px; height: 158px; }
-  .help-phone { padding: 4px; border-radius: 17px; }
-  .help-phone::after { border-radius: 15px; }
-  .help-phone-sensor { top: 7px; width: 24px; height: 3px; }
-  .help-phone-screen { padding: 13px 5px 5px; border-radius: 13px; }
-  .help-phone-status { gap: 3px; font-size: 4.8px; }
-  .help-phone-status > span { width: 3px; height: 3px; }
-  .help-phone-portrait { width: 70px; height: 63px; }
-  .portal-heading .help-phone-portrait .ossi-portrait { width: 100%; height: 100%; }
-  .portal-heading .help-phone-portrait .ossi-portrait-halo { inset: 24% 1% 3%; }
-  .help-phone-name { margin-top: -2px; font-size: 10px; }
-  .help-phone-caption { margin-top: 2px; font-size: 4.5px; }
-  .help-phone-call { width: 21px; height: 21px; margin-top: 6px; box-shadow: 0 4px 10px rgba(0, 8, 15, .35), 0 0 0 2px rgba(100, 220, 155, .08); }
-  .help-phone-call svg { width: 10px; height: 10px; }
+  .portal-heading-custom-visual { min-height: 280px; padding-right: 132px; }
+  .portal-heading-visual { top: 8px; right: -2px; width: 130px; height: 231px; }
+  .help-phone-visual { width: 114px; height: 229px; }
+  .help-phone-visual .help-phone-preview { transform: translateX(-50%) scale(.32); }
   .portal-heading-actions { padding-bottom: 72px; }
   .portal-heading-actions .page-actions { right: 0; bottom: 18px; }
   .page-actions { width: 100%; }
@@ -1031,9 +966,10 @@ td small { color: var(--muted); }
   .portal-heading .ossi-portrait-session { right: -24px; width: 116px; height: 164px; }
   .portal-heading-actions .ossi-portrait-heading,
   .portal-heading-actions .ossi-portrait-session { top: 18px; bottom: auto; height: 104px; }
-  .portal-heading-custom-visual { min-height: 242px; padding-right: 112px; }
-  .portal-heading-visual { right: -6px; width: 116px; }
-  .help-phone-visual { width: 102px; height: 152px; }
+  .portal-heading-custom-visual { min-height: 270px; padding-right: 116px; }
+  .portal-heading-visual { right: -6px; width: 122px; }
+  .help-phone-visual { width: 110px; height: 222px; }
+  .help-phone-visual .help-phone-preview { transform: translateX(-50%) scale(.31); }
   .portal-grid { gap: 13px; }
   .page-actions { flex-direction: row; flex-wrap: wrap; gap: 8px; }
   .page-actions .button { flex: 1 1 120px; min-width: 0; white-space: nowrap; }
