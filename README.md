@@ -36,7 +36,11 @@ npm run lint
 npm test
 npm run test:e2e
 npm run build
+npm run start
+npm run test:performance
 ```
+
+Für den Performance-Smoke muss `npm run start` nach dem Build in einem separaten Terminal laufen.
 
 Die acht versionierten ElevenLabs-Multi-Turn-Simulationen werden bewusst nicht bei jedem normalen CI-Lauf ausgeführt. Testdefinitionen werden einmalig beziehungsweise nach Änderungen mit `npm run test:agent:sync` in den dedizierten V2-Workspace synchronisiert. Vor einem Agenten-Release führt `npm run test:agent:release` das Kandidaten-Gate mit lokalem Konfigurations-Override aus. Der einzige freigegebene vollständige Release-Pfad ist:
 
@@ -47,6 +51,16 @@ npm run release:agent
 Dieser Befehl validiert zuerst Agent- und Branch-ID, führt jeden Test fünfmal aus, pusht nur nach bestandenem Gate den V2-Agenten und startet danach zwei Smokes gegen die gespeicherte Remote-Konfiguration. Der Schlüssel wird ausschließlich aus `ELEVENLABS_API_KEY` gelesen; vollständige Simulationstranskripte werden nicht ausgegeben. Details und den verpflichtenden manuellen Audio-Smoke beschreibt [docs/production-setup.md](docs/production-setup.md).
 
 Die vollständige Produktionsinbetriebnahme einschließlich SMTP, Auth-Templates, erstem Admin, Cron, Webhook und Vercel-Secrets ist in [docs/production-setup.md](docs/production-setup.md) beschrieben.
+
+## Einmalige Bereinigung alter Bewertungen
+
+Die Bereinigung startet grundsätzlich ohne Schreibzugriff. Sie erkennt Rollenspielphasen, meldet unklare Sessions und zeigt zu entfernende Bewertungen und Belegfragmente:
+
+```bash
+npm run maintenance:evaluations:dry-run
+```
+
+Erst nach Prüfung des Berichts wird derselbe Lauf mit `npm run maintenance:evaluations:apply` angewendet. Dabei werden ungültige Bewertungen auf „Nicht bewertet“ gesetzt, kontaminierte Empfehlungen entfernt und Kompetenzfortschritt sowie Lernprofile ausschließlich aus Sessions mit sicher erkannten Rollenspielgrenzen neu aufgebaut. Sessions mit fehlenden oder mehrdeutigen Grenzen bleiben unverändert und werden protokolliert.
 
 ## Datenschutz
 

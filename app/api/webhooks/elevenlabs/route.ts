@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { apiErrorResponse, ApiError } from "@/lib/api";
 import { validateCriterionEvaluations } from "@/lib/coaching/evaluation-integrity";
 import { recomputeLearningProfiles } from "@/lib/coaching/recompute";
+import { analyzeTranscriptPhases } from "@/lib/coaching/transcript-phases";
 import { extractPostCallAnalysis } from "@/lib/elevenlabs/analysis";
 import { verifyElevenLabsSignature } from "@/lib/elevenlabs/signature";
 import { requireServerEnv } from "@/lib/env";
@@ -68,13 +69,13 @@ export async function POST(request: Request) {
     receiptClaimed = true;
 
     const { data: session } = await supabase.from("coaching_sessions")
-      .select("id,user_id,training_type_version_id,scenario_snapshot,status")
+      .select("id,user_id,scenario_snapshot,status,version:training_type_versions!inner(training_type_id,elevenlabs_agent_id)")
       .eq("elevenlabs_conversation_id", conversationId).maybeSingle();
     if (!session) {
       await supabase.rpc("finish_webhook_receipt", { receipt_conversation_id: conversationId, receipt_status: "failed", receipt_error: "Session not bound" });
       throw new ApiError(409, "Die Conversation ist noch keiner Session zugeordnet.", "session_not_bound");
     }
-    const { data: version } = await supabase.from("training_type_versions").select("training_type_id,elevenlabs_agent_id").eq("id", session.training_type_version_id).single();
+    const version = Array.isArray(session.version) ? session.version[0] : session.version;
     if (!version || version.elevenlabs_agent_id !== data.agent_id) throw new ApiError(403, "Agent und gespeicherte Trainingsversion stimmen nicht überein.", "agent_version_mismatch");
 
     await supabase.from("coaching_sessions").update({ status: "processing", processing_error: null }).eq("id", session.id);
@@ -83,6 +84,7 @@ export async function POST(request: Request) {
     const duration = Number(metadata.call_duration_secs ?? metadata.call_duration_seconds ?? 0);
     const snapshot = session.scenario_snapshot as Record<string, unknown>;
     const transcript = cleanTranscript(data.transcript);
+    const phaseAnalysis = analyzeTranscriptPhases(transcript);
     const completedAt = new Date().toISOString();
 
     const { data: criteria, error: criteriaError } = await supabase.from("evaluation_criteria")
@@ -98,7 +100,11 @@ export async function POST(request: Request) {
         evidence: extracted.criterionEvidence[slug],
         recommendation: extracted.nextLearningGoal,
       };
-    }), transcript);
+    }), transcript, phaseAnalysis);
+    const acceptedLearningGoal = phaseAnalysis.status === "recognized"
+      && evaluations.some((evaluation) => evaluation.score !== null)
+      ? extracted.nextLearningGoal
+      : null;
     const { error: evaluationsError } = await supabase.from("session_evaluations").upsert(evaluations, { onConflict: "session_id,criterion_id" });
     if (evaluationsError) throw evaluationsError;
 
@@ -114,7 +120,7 @@ export async function POST(request: Request) {
     }).eq("id", session.id);
     if (sessionError) throw sessionError;
 
-    await recomputeLearningProfiles(supabase, session.user_id, version.training_type_id, session.id, extracted.nextLearningGoal);
+    await recomputeLearningProfiles(supabase, session.user_id, version.training_type_id, session.id, acceptedLearningGoal);
     await supabase.rpc("finish_webhook_receipt", { receipt_conversation_id: conversationId, receipt_status: "processed", receipt_error: null });
     return NextResponse.json({ received: true, sessionId: session.id });
   } catch (error) {

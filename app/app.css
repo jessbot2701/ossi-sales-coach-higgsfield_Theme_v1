@@ -561,6 +561,14 @@
 .transcript-disclosure[open] summary::after { content: "–"; }
 .transcript-disclosure summary span { margin-left: auto; color: var(--muted); font-size: 11px; font-weight: 600; }
 .transcript { display: grid; gap: 9px; margin-top: 12px; padding-top: 4px; }
+.transcript-segment { display: grid; gap: 9px; min-width: 0; }
+.transcript-phase-divider { display: flex; align-items: center; gap: 12px; width: 100%; margin: 8px 0 2px; color: #91a9ba; font-size: 10px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+.transcript-phase-divider::before,
+.transcript-phase-divider::after { content: ""; height: 1px; flex: 1; background: rgba(102, 189, 243, .2); }
+.transcript-phase-divider.roleplay { color: var(--blue-soft); }
+.transcript-phase-divider.roleplay::before,
+.transcript-phase-divider.roleplay::after { background: rgba(102, 189, 243, .42); }
+.transcript-phase-warning { margin: 0 0 6px; padding: 10px 12px; border: 1px solid rgba(244, 179, 80, .28); border-radius: 9px; color: #d9c39a; background: rgba(94, 57, 13, .16); font-size: 12px; line-height: 1.45; }
 .transcript-turn { max-width: 88%; padding: 11px 13px; border-radius: 11px; color: #dcebf4; background: rgba(16, 46, 69, .9); font-size: 13px; line-height: 1.55; }
 .transcript-turn.agent { margin-right: auto; border-bottom-left-radius: 4px; }
 .transcript-turn.user { margin-left: auto; border-bottom-right-radius: 4px; background: rgba(22, 140, 227, .18); }

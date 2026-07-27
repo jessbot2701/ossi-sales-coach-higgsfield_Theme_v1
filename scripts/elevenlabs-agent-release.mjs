@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -36,6 +36,7 @@ const ROOT_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const ELEVENLABS_DIR = join(ROOT_DIR, "elevenlabs");
 const AGENTS_PATH = join(ELEVENLABS_DIR, "agents.json");
 const TESTS_PATH = join(ELEVENLABS_DIR, "tests.json");
+const TEST_RESULTS_DIR = join(ROOT_DIR, "artifacts", "test-results");
 
 function fail(message) {
   throw new Error(message);
@@ -51,6 +52,14 @@ async function readJson(path) {
 
 async function writeJson(path, value) {
   await writeFile(path, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+}
+
+async function saveInvocationReport(invocation, label) {
+  await mkdir(TEST_RESULTS_DIR, { recursive: true });
+  const safeTimestamp = new Date().toISOString().replaceAll(":", "").replaceAll(".", "");
+  const path = join(TEST_RESULTS_DIR, `elevenlabs-${label}-${safeTimestamp}.json`);
+  await writeJson(path, invocation);
+  console.log(`ElevenLabs-Testbericht: ${path}`);
 }
 
 function requireApiKey() {
@@ -303,11 +312,53 @@ async function runGate() {
     override: candidateOverride(state.agentConfig),
     repeatCount: REPEAT_COUNT,
   });
+  console.log(`ElevenLabs-Invocation: ${invocationId}`);
   const invocation = await waitForInvocation(apiKey, invocationId);
+  await saveInvocationReport(invocation, "gate");
   if (!evaluateInvocation(invocation, state.testDefinitions, REPEAT_COUNT)) {
     fail("V2-Agenten-Release durch unzureichende Simulationsstabilität blockiert.");
   }
   console.log("Kandidaten-Gate bestanden.");
+}
+
+async function runDebriefGate() {
+  const state = await loadReleaseState();
+  const apiKey = requireApiKey();
+  const debriefTests = state.testDefinitions.filter(
+    ({ configPath }) => configPath === TEST_CONFIGS[6],
+  );
+  console.log(`Starte fokussiertes Debriefing-Gate: ${REPEAT_COUNT} Läufe.`);
+  const invocationId = await startInvocation(apiKey, debriefTests, {
+    override: candidateOverride(state.agentConfig),
+    repeatCount: REPEAT_COUNT,
+  });
+  console.log(`ElevenLabs-Invocation: ${invocationId}`);
+  const invocation = await waitForInvocation(apiKey, invocationId);
+  await saveInvocationReport(invocation, "debrief");
+  if (!evaluateInvocation(invocation, debriefTests, REPEAT_COUNT)) {
+    fail("Debriefing-Gate durch unzureichende Simulationsstabilität blockiert.");
+  }
+  console.log("Debriefing-Gate bestanden.");
+}
+
+async function runReceptionGate() {
+  const state = await loadReleaseState();
+  const apiKey = requireApiKey();
+  const receptionTests = state.testDefinitions.filter(
+    ({ configPath }) => configPath === TEST_CONFIGS[2],
+  );
+  console.log(`Starte fokussiertes Zentralen-Gate: ${REPEAT_COUNT} Läufe.`);
+  const invocationId = await startInvocation(apiKey, receptionTests, {
+    override: candidateOverride(state.agentConfig),
+    repeatCount: REPEAT_COUNT,
+  });
+  console.log(`ElevenLabs-Invocation: ${invocationId}`);
+  const invocation = await waitForInvocation(apiKey, invocationId);
+  await saveInvocationReport(invocation, "reception");
+  if (!evaluateInvocation(invocation, receptionTests, REPEAT_COUNT, { smoke: true })) {
+    fail("Zentralen-Gate durch unzureichende Simulationsstabilität blockiert.");
+  }
+  console.log("Zentralen-Gate bestanden.");
 }
 
 async function runSmoke() {
@@ -316,7 +367,9 @@ async function runSmoke() {
   const smokeTests = state.testDefinitions.filter(({ configPath }) => SMOKE_CONFIGS.has(configPath));
   console.log("Starte Post-Push-Smoke gegen die gespeicherte Remote-Konfiguration.");
   const invocationId = await startInvocation(apiKey, smokeTests, { repeatCount: 1 });
+  console.log(`ElevenLabs-Invocation: ${invocationId}`);
   const invocation = await waitForInvocation(apiKey, invocationId);
+  await saveInvocationReport(invocation, "smoke");
   if (!evaluateInvocation(invocation, smokeTests, 1, { smoke: true })) {
     fail("Post-Push-Smoke fehlgeschlagen.");
   }
@@ -358,9 +411,11 @@ async function main() {
   const action = process.argv[2] ?? "gate";
   if (action === "sync-tests") return syncTests();
   if (action === "gate") return runGate();
+  if (action === "gate-debrief") return runDebriefGate();
+  if (action === "gate-reception") return runReceptionGate();
   if (action === "smoke") return runSmoke();
   if (action === "release") return releaseAgent();
-  fail(`Unbekannte Aktion '${action}'. Erlaubt: sync-tests, gate, smoke, release.`);
+  fail(`Unbekannte Aktion '${action}'. Erlaubt: sync-tests, gate, gate-debrief, gate-reception, smoke, release.`);
 }
 
 main().catch((error) => {

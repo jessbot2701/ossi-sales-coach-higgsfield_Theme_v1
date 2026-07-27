@@ -62,7 +62,11 @@ export default async function LandingPage() {
 
             <div className="hero-copy">
               <p className="eyebrow reveal-item">KI-gestütztes Vertriebstraining</p>
-              <h1 id="hero-title" className="reveal-item">
+              <h1
+                id="hero-title"
+                className="reveal-item"
+                aria-label="Meet Ossi. The Prince of Sales Calls."
+              >
                 Meet Ossi.<br />
                 <em>
                   <span className="hero-title-line">The Prince of</span>

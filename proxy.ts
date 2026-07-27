@@ -19,7 +19,8 @@ export async function proxy(request: NextRequest) {
   });
 
   const { data } = await supabase.auth.getClaims();
-  const isAuthenticated = Boolean(data?.claims?.sub);
+  const userId = data?.claims?.sub;
+  const isAuthenticated = Boolean(userId);
   const protectedPath = request.nextUrl.pathname.startsWith("/app") || request.nextUrl.pathname.startsWith("/admin");
   if (protectedPath && !isAuthenticated) {
     const login = request.nextUrl.clone();
@@ -27,11 +28,18 @@ export async function proxy(request: NextRequest) {
     login.searchParams.set("next", request.nextUrl.pathname);
     return NextResponse.redirect(login);
   }
-  if (request.nextUrl.pathname === "/login" && isAuthenticated) {
-    const app = request.nextUrl.clone();
-    app.pathname = "/app";
-    app.search = "";
-    return NextResponse.redirect(app);
+  if (request.nextUrl.pathname === "/login" && userId) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("is_active")
+      .eq("id", userId)
+      .maybeSingle();
+    if (profile?.is_active === true) {
+      const app = request.nextUrl.clone();
+      app.pathname = "/app";
+      app.search = "";
+      return NextResponse.redirect(app);
+    }
   }
   return response;
 }

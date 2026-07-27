@@ -2,6 +2,7 @@
   "name": "ossi-sales-coach-v2",
   "version": "2.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -11,10 +12,17 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:functional": "node --env-file-if-exists=.env.local scripts/full-functional-test.mjs",
+    "test:performance": "node --env-file-if-exists=.env.local scripts/performance-smoke.mjs",
+    "test:voice:e2e": "node --env-file-if-exists=.env.local scripts/multi-voice-e2e.mjs",
     "test:agent:sync": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/elevenlabs-agent-release.mjs sync-tests",
     "test:agent:release": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/elevenlabs-agent-release.mjs gate",
+    "test:agent:debrief": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/elevenlabs-agent-release.mjs gate-debrief",
+    "test:agent:reception": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/elevenlabs-agent-release.mjs gate-reception",
     "test:agent:smoke": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/elevenlabs-agent-release.mjs smoke",
-    "release:agent": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/elevenlabs-agent-release.mjs release"
+    "release:agent": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/elevenlabs-agent-release.mjs release",
+    "maintenance:evaluations:dry-run": "node --experimental-strip-types --env-file-if-exists=.env.local scripts/cleanup-roleplay-evaluations.mts --dry-run",
+    "maintenance:evaluations:apply": "node --experimental-strip-types --env-file-if-exists=.env.local scripts/cleanup-roleplay-evaluations.mts --apply"
   },
   "dependencies": {
     "@elevenlabs/react": "1.10.1",

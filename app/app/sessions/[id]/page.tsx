@@ -3,6 +3,10 @@ import Link from "next/link";
 import { DeleteSessionButton } from "@/components/delete-session-button";
 import { PortalHeading } from "@/components/portal-heading";
 import { requirePageUser } from "@/lib/auth";
+import {
+  analyzeTranscriptPhases,
+  type TranscriptPhase,
+} from "@/lib/coaching/transcript-phases";
 import { createClient } from "@/lib/supabase/server";
 
 type Turn = { role?: string; message?: string };
@@ -21,8 +25,14 @@ function visibleTranscriptText(message?: string) {
   return (message ?? "").replace(/<\/?(?:Christian|Susanne|Helmut)>/g, "").replace(/\s+/g, " ").trim();
 }
 
-function agentLabel(message?: string) {
-  return message?.includes("<Helmut>") ? "Ossi / Coach" : "Ossi / Rolle";
+const transcriptSectionLabel: Record<TranscriptPhase, string> = {
+  coach_intro: "Coach-Start",
+  roleplay: "Rollenspiel",
+  coach_debrief: "Coach-Auswertung",
+};
+
+function agentLabel(phase: TranscriptPhase) {
+  return phase === "roleplay" ? "Ossi / Kundenrolle" : "Ossi / Coach";
 }
 
 function scorePresentation(score: number | null): { label: string; tone: ScoreTone } {
@@ -78,13 +88,19 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
   const { id } = await params;
   const user = await requirePageUser();
   const supabase = await createClient();
-  const { data: session } = await supabase.from("coaching_sessions").select("id,title,status,summary,transcript,transcript_deleted_at,created_at,completed_at,duration_seconds,processing_error,scenario_snapshot").eq("id", id).eq("user_id", user.id).maybeSingle();
+  let sessionQuery = supabase
+    .from("coaching_sessions")
+    .select("id,user_id,title,status,summary,transcript,transcript_deleted_at,created_at,completed_at,duration_seconds,processing_error,scenario_snapshot")
+    .eq("id", id);
+  if (user.role !== "admin") sessionQuery = sessionQuery.eq("user_id", user.id);
+  const { data: session } = await sessionQuery.maybeSingle();
   if (!session) notFound();
   const [{ data: evaluations }, { data: learning }] = await Promise.all([
     supabase.from("session_evaluations").select("score,reasoning,evidence,recommendation,criterion:evaluation_criteria(name,sort_order)").eq("session_id", id),
-    supabase.from("learning_profiles").select("next_learning_goal").eq("source_session_id", id).eq("user_id", user.id).limit(1).maybeSingle(),
+    supabase.from("learning_profiles").select("next_learning_goal").eq("source_session_id", id).eq("user_id", session.user_id).limit(1).maybeSingle(),
   ]);
   const transcript = Array.isArray(session.transcript) ? session.transcript as Turn[] : [];
+  const transcriptPhases = analyzeTranscriptPhases(transcript);
   const sortedEvaluations = [...(evaluations ?? [])].sort((a, b) => { const ac = Array.isArray(a.criterion) ? a.criterion[0] : a.criterion; const bc = Array.isArray(b.criterion) ? b.criterion[0] : b.criterion; return Number(ac?.sort_order) - Number(bc?.sort_order); });
   const repeatedReasoning = new Set(sortedEvaluations.flatMap((item, index, items) => {
     const value = item.reasoning?.trim();
@@ -248,12 +264,29 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
             <details className="transcript-disclosure">
               <summary>Transkript anzeigen <span>{transcript.length} Beiträge</span></summary>
               <div className="transcript">
-                {transcript.map((turn, index) => (
-                  <div className={`transcript-turn ${turn.role}`} key={index}>
-                    <strong>{turn.role === "user" ? "Du" : agentLabel(turn.message)}</strong>
-                    {visibleTranscriptText(turn.message)}
-                  </div>
-                ))}
+                {transcriptPhases.status !== "recognized" && (
+                  <p className="transcript-phase-warning">
+                    Die Rollenspielgrenzen dieses älteren Transkripts sind nicht eindeutig erkennbar.
+                  </p>
+                )}
+                {transcriptPhases.segments.map((segment, index, segments) => {
+                  const showDivider = index === 0 || segments[index - 1].phase !== segment.phase;
+                  return (
+                    <div className="transcript-segment" key={`${segment.turnIndex}-${segment.phase}-${index}`}>
+                      {showDivider && (
+                        <div className={`transcript-phase-divider ${segment.phase}`} role="separator">
+                          <span>{transcriptSectionLabel[segment.phase]}</span>
+                        </div>
+                      )}
+                      <div className={`transcript-turn ${segment.role}`}>
+                        <strong>
+                          {segment.role === "user" ? "Du" : agentLabel(segment.phase)}
+                        </strong>
+                        {visibleTranscriptText(segment.message)}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </details>
           ) : (
@@ -270,7 +303,9 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
               Verknüpfungen vollständig löschen.
             </p>
           </div>
-          <DeleteSessionButton id={session.id} />
+          {session.user_id === user.id
+            ? <DeleteSessionButton id={session.id} />
+            : <p className="form-message">Administrativer Nur-Lese-Zugriff</p>}
         </section>
       </div>
     </>
