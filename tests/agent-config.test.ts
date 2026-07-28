@@ -117,6 +117,9 @@ describe("isolated V2 agent configuration", () => {
     expect(prompt).toContain("Wirkt der Nutzer argumentativ, vage, defensiv oder nennt keinen klaren Kundennutzen");
     expect(prompt).toContain("Vertiefe den bestehenden Einwand mit einer passenden Rückfrage");
     expect(prompt).toContain("Schenke weder Interesse noch Termin");
+    expect(prompt).toContain("vertiefe jeden ersten Einwand nach der ersten Nutzerreaktion mindestens einmal");
+    expect(prompt).toContain("Eröffne anschließend einen logisch anderen zweiten Widerstand");
+    expect(prompt).toContain("erst zu, nachdem beide Widerstandsmomente tatsächlich trainiert wurden");
   });
 
   it("requires the reception to qualify both topic and business relevance", () => {

@@ -35,6 +35,19 @@ describe("ElevenLabs V2 release simulation suite", () => {
     expect(releaseScript).toContain("await verifyPushedAgent()");
   });
 
+  it("provides a focused five-run objection-handling stability gate at the release threshold", () => {
+    const releaseScript = readFileSync(
+      join(process.cwd(), "scripts/elevenlabs-agent-release.mjs"),
+      "utf8",
+    );
+    const packageJson = JSON.parse(readFileSync(join(process.cwd(), "package.json"), "utf8"));
+    expect(releaseScript).toContain("async function runObjectionGate()");
+    expect(releaseScript).toContain("TEST_CONFIGS[3]");
+    expect(releaseScript).toContain('action === "gate-objection"');
+    expect(releaseScript).toContain("evaluateInvocation(invocation, objectionTests, REPEAT_COUNT)");
+    expect(packageJson.scripts["test:agent:objection"]).toContain("gate-objection");
+  });
+
   it("versions exactly eight multi-turn simulation tests", () => {
     expect(registry.tests).toHaveLength(8);
     expect(new Set(registry.tests.map((test: { config: string }) => test.config)).size).toBe(8);

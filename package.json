@@ -19,6 +19,7 @@
     "test:agent:release": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/elevenlabs-agent-release.mjs gate",
     "test:agent:debrief": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/elevenlabs-agent-release.mjs gate-debrief",
     "test:agent:reception": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/elevenlabs-agent-release.mjs gate-reception",
+    "test:agent:objection": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/elevenlabs-agent-release.mjs gate-objection",
     "test:agent:smoke": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/elevenlabs-agent-release.mjs smoke",
     "release:agent": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/elevenlabs-agent-release.mjs release",
     "maintenance:evaluations:dry-run": "node --experimental-strip-types --env-file-if-exists=.env.local scripts/cleanup-roleplay-evaluations.mts --dry-run",

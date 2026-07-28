@@ -361,6 +361,26 @@ async function runReceptionGate() {
   console.log("Zentralen-Gate bestanden.");
 }
 
+async function runObjectionGate() {
+  const state = await loadReleaseState();
+  const apiKey = requireApiKey();
+  const objectionTests = state.testDefinitions.filter(
+    ({ configPath }) => configPath === TEST_CONFIGS[3],
+  );
+  console.log(`Starte fokussiertes Einwandbehandlungs-Gate: ${REPEAT_COUNT} Läufe.`);
+  const invocationId = await startInvocation(apiKey, objectionTests, {
+    override: candidateOverride(state.agentConfig),
+    repeatCount: REPEAT_COUNT,
+  });
+  console.log(`ElevenLabs-Invocation: ${invocationId}`);
+  const invocation = await waitForInvocation(apiKey, invocationId);
+  await saveInvocationReport(invocation, "objection");
+  if (!evaluateInvocation(invocation, objectionTests, REPEAT_COUNT)) {
+    fail("Einwandbehandlungs-Gate durch unzureichende Simulationsstabilität blockiert.");
+  }
+  console.log("Einwandbehandlungs-Gate bestanden.");
+}
+
 async function runSmoke() {
   const state = await loadReleaseState();
   const apiKey = requireApiKey();
@@ -453,9 +473,10 @@ async function main() {
   if (action === "gate") return runGate();
   if (action === "gate-debrief") return runDebriefGate();
   if (action === "gate-reception") return runReceptionGate();
+  if (action === "gate-objection") return runObjectionGate();
   if (action === "smoke") return runSmoke();
   if (action === "release") return releaseAgent();
-  fail(`Unbekannte Aktion '${action}'. Erlaubt: sync-tests, gate, gate-debrief, gate-reception, smoke, release.`);
+  fail(`Unbekannte Aktion '${action}'. Erlaubt: sync-tests, gate, gate-debrief, gate-reception, gate-objection, smoke, release.`);
 }
 
 main().catch((error) => {
