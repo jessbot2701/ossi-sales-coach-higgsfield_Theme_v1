@@ -400,10 +400,50 @@ function pushAgent() {
   if (result.status !== 0) fail(`ElevenLabs-CLI-Push schlug mit Exit-Code ${result.status} fehl.`);
 }
 
+async function verifyPushedAgent() {
+  const state = await loadReleaseState();
+  const apiKey = requireApiKey();
+  const remote = await apiRequest(
+    apiKey,
+    `/v1/convai/agents/${encodeURIComponent(EXPECTED_AGENT_ID)}?branch_id=${encodeURIComponent(EXPECTED_BRANCH_ID)}`,
+    { method: "GET" },
+  );
+  const localCollection = state.agentConfig.platform_settings?.data_collection;
+  const remoteCollection = remote?.platform_settings?.data_collection;
+  if (!localCollection || !remoteCollection) {
+    fail("Die Data-Collection-Konfiguration konnte nach dem Push nicht remote verifiziert werden.");
+  }
+
+  const localKeys = Object.keys(localCollection).sort();
+  const remoteKeys = Object.keys(remoteCollection).sort();
+  if (localKeys.length !== 25) {
+    fail(`Die lokale Konfiguration enthält ${localKeys.length} statt exakt 25 Data-Collection-Feldern.`);
+  }
+  if (JSON.stringify(remoteKeys) !== JSON.stringify(localKeys)) {
+    fail("Der ElevenLabs-Push wurde nicht übernommen: Remote- und lokale Data-Collection-Felder unterscheiden sich.");
+  }
+  for (const key of localKeys) {
+    if (
+      remoteCollection[key]?.type !== localCollection[key]?.type
+      || remoteCollection[key]?.description !== localCollection[key]?.description
+    ) {
+      fail(`Der ElevenLabs-Push wurde für das Data-Collection-Feld '${key}' nicht vollständig übernommen.`);
+    }
+  }
+
+  const localPrompt = state.agentConfig.conversation_config?.agent?.prompt?.prompt;
+  const remotePrompt = remote?.conversation_config?.agent?.prompt?.prompt;
+  if (remotePrompt !== localPrompt) {
+    fail("Der ElevenLabs-Push wurde nicht vollständig übernommen: Der Remote-Prompt entspricht nicht dem Release-Kandidaten.");
+  }
+  console.log("Remote-Konfiguration verifiziert: Prompt und exakt 25 Data-Collection-Felder stimmen überein.");
+}
+
 async function releaseAgent() {
   await runGate();
   console.log("Gate bestanden; pushe ausschließlich den freigegebenen V2-Agenten und Branch.");
   pushAgent();
+  await verifyPushedAgent();
   await runSmoke();
 }
 

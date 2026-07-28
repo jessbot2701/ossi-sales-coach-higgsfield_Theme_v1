@@ -21,8 +21,8 @@ describe("isolated V2 agent configuration", () => {
       expect(collection[`${key}_evidence`].type).toBe("string");
       expect(collection[`${key}_improvement`].type).toBe("string");
     }
-    for (const key of ["summary", "strengths", "next_learning_goal"]) expect(collection[key].type).toBe("string");
-    expect(Object.keys(collection).length).toBeLessThanOrEqual(40);
+    expect(collection.session_conclusion.type).toBe("string");
+    expect(Object.keys(collection)).toHaveLength(25);
   });
 
   it("limits every evaluation field and learning goal to the marked roleplay", () => {
@@ -33,13 +33,17 @@ describe("isolated V2 agent configuration", () => {
       `${key}_feedback`,
       `${key}_evidence`,
       `${key}_improvement`,
-    ]).concat(["strengths", "next_learning_goal"]);
+    ]).concat(["session_conclusion"]);
 
     for (const field of restrictedFields) {
       expect(collection[field].description).toContain("Rollenspielphase");
       expect(collection[field].description).toContain("Coach-Intro");
-      expect(collection[field].description).toContain("leer lassen");
+      expect(collection[field].description).toMatch(/leer lassen|leeren String/);
     }
+
+    expect(collection.session_conclusion.description).toContain("\"summary\"");
+    expect(collection.session_conclusion.description).toContain("\"strengths\"");
+    expect(collection.session_conclusion.description).toContain("\"next_learning_goal\"");
   });
 
   it("limits category improvements to the three most important evidenced levers", () => {

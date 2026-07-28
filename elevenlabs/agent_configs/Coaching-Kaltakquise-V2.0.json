@@ -313,17 +313,9 @@
         "type": "string",
         "description": "Nur wenn Sprachwirkung und Lösungsorientierung über alle sechs Kategorien dieser Session hinweg zu den höchstens drei wichtigsten Hebeln gehören: genau ein JSON-Objekt mit allen Feldern {\"improvement\":\"konkrete kategoriespezifische Verbesserung\",\"alternative\":\"genau eine direkt nutzbare Alternativformulierung\",\"evidence\":\"genau eine kurze wörtliche Nutzeraussage aus der Rollenspielphase\",\"priority\":1} zurückgeben. Priorität ist eindeutig 1, 2 oder 3; 1 ist der größte erwartete Hebel. Coach-Intro ignorieren. Ohne vollständigen belegbaren wichtigen Hebel leer lassen."
       },
-      "summary": {
+      "session_conclusion": {
         "type": "string",
-        "description": "Kompakte neutrale Zusammenfassung der Session in höchstens drei Sätzen."
-      },
-      "strengths": {
-        "type": "string",
-        "description": "Bis zu drei konkret beobachtete Stärken, kommasepariert. Ausschließlich Aussagen des Nutzers während der klar markierten Rollenspielphase zwischen „Rollenspiel beginnt.“ und „Rollenspiel beendet – zurück im Coach-Modus.“ auswerten; Coach-Intro, Nachbesprechung und Abschlussgespräch vollständig ignorieren. Wenn das Kriterium dort nicht beobachtbar ist, das Feld leer lassen."
-      },
-      "next_learning_goal": {
-        "type": "string",
-        "description": "Genau ein konkretes und trainierbares nächstes Lernziel, abgeleitet aus dem schwächsten beobachteten Kriterium. Ausschließlich Aussagen des Nutzers während der klar markierten Rollenspielphase zwischen „Rollenspiel beginnt.“ und „Rollenspiel beendet – zurück im Coach-Modus.“ auswerten; Coach-Intro, Nachbesprechung und Abschlussgespräch vollständig ignorieren. Wenn das Kriterium dort nicht beobachtbar ist, das Feld leer lassen."
+        "description": "Genau ein JSON-Objekt mit allen Feldern {\"summary\":\"kompaktes neutrales Kurzfazit in höchstens drei Sätzen\",\"strengths\":[\"bis zu drei konkret beobachtete Stärken\"],\"next_learning_goal\":\"genau ein konkretes trainierbares Lernziel aus der schwächsten beobachteten Fähigkeit\"} zurückgeben. Ausschließlich Aussagen des Nutzers während der klar markierten Rollenspielphase auswerten; Coach-Intro, Nachbesprechung und Abschlussgespräch vollständig ignorieren. Nicht beobachtbare Inhalte als leeren String beziehungsweise leeres Array zurückgeben."
       }
     },
     "data_collection_scopes": {},

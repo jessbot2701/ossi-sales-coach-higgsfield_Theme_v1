@@ -24,6 +24,17 @@ const requiredVariables = [
 ];
 
 describe("ElevenLabs V2 release simulation suite", () => {
+  it("verifies the remote prompt and the exact 25-field tier limit after every push", () => {
+    const releaseScript = readFileSync(
+      join(process.cwd(), "scripts/elevenlabs-agent-release.mjs"),
+      "utf8",
+    );
+    expect(releaseScript).toContain("async function verifyPushedAgent()");
+    expect(releaseScript).toContain("localKeys.length !== 25");
+    expect(releaseScript).toContain("remotePrompt !== localPrompt");
+    expect(releaseScript).toContain("await verifyPushedAgent()");
+  });
+
   it("versions exactly eight multi-turn simulation tests", () => {
     expect(registry.tests).toHaveLength(8);
     expect(new Set(registry.tests.map((test: { config: string }) => test.config)).size).toBe(8);

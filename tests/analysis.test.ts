@@ -22,8 +22,13 @@ describe("post-call analysis extraction", () => {
             priority: 1,
           }),
         },
-        summary: { value: "Kompakte Zusammenfassung" },
-        next_learning_goal: { value: "Einwände spiegeln" },
+        session_conclusion: {
+          value: JSON.stringify({
+            summary: "Kompakte Zusammenfassung",
+            strengths: ["Ruhige Sprache", "Klare Frage"],
+            next_learning_goal: "Einwände spiegeln",
+          }),
+        },
       },
     });
     expect(Object.values(result.scores)).toEqual([4, 3, 5, 2, 3, 4]);
@@ -35,6 +40,7 @@ describe("post-call analysis extraction", () => {
     expect(result.improvementEvidenceByCriterion.conversation_opening).toBe("Ich würde gerne unser Portfolio vorstellen.");
     expect(result.improvementPriorities.conversation_opening).toBe(1);
     expect(result.feedback.needs_discovery).toBeNull();
+    expect(result.strengths).toBe("Ruhige Sprache, Klare Frage");
     expect(result.nextLearningGoal).toBe("Einwände spiegeln");
   });
 
