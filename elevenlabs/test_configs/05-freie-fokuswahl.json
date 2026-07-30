@@ -13,10 +13,12 @@
     "training_strengths": "relevante Nutzenargumentation",
     "training_focus_areas": "Einwandbehandlung",
     "recent_session_summaries": "Synthetische Rückschau: Einwände wurden zu schnell beantwortet.",
-    "current_learning_goal": "Einwände mit einer offenen Rückfrage vertiefen."
+    "current_learning_goal": "Einwände mit einer offenen Rückfrage vertiefen.",
+    "conversation_occasion": "Einladung zu einer Kundenveranstaltung",
+    "context_collection_instruction": "Erfrage zuerst Veranstaltung und konkreten Kontext. Wähle anschließend eine passende Kundensituation."
   },
   "chat_history": [],
   "success_condition": "Obwohl Profil, Fokusfelder und Lernziel Einwandbehandlung empfehlen, respektiert Ossi die ausdrücklich gewählte Session-Fokuswahl 'Abschluss und Terminsteuerung'. Er gestaltet das Rollenspiel so, dass ein konkreter nächster Schritt, Termin oder verbindlicher Abschluss mehrfach geübt werden kann, und erklärt oder erzwingt keinen Wechsel zurück zur Einwandbehandlung. Die Empfehlung darf höchstens beiläufig berücksichtigt werden und niemals die Nutzerwahl überstimmen.",
-  "simulation_scenario": "Du bist Nina im IGZ-Vertrieb. Bestätige zu Beginn ausdrücklich: 'Heute möchte ich Abschluss und Terminsteuerung trainieren, nicht Einwandbehandlung.' Führe das synthetische Gespräch so, dass du zunächst einen unverbindlichen und später einen konkreten nächsten Schritt formulierst. Achte darauf, ob Ossi deine Auswahl respektiert, selbst wenn das Profil etwas anderes empfiehlt. Beende nach der Termin- oder Folgeschrittsequenz.",
+  "simulation_scenario": "Wenn Ossi nach Veranstaltung und Kontext fragt, nenne als Veranstaltung die „Innovation Days“ und als Kontext einen Erstkontakt zu einem SAP-Logistik-Verantwortlichen in einem laufenden S/4-Projekt. Bestätige erst die anschließende Bereitschaftsfrage. Du bist Nina im IGZ-Vertrieb. Bestätige zu Beginn ausdrücklich: 'Heute möchte ich Abschluss und Terminsteuerung trainieren, nicht Einwandbehandlung.' Führe das synthetische Gespräch so, dass du zunächst einen unverbindlichen und später einen konkreten nächsten Schritt formulierst. Achte darauf, ob Ossi deine Auswahl respektiert, selbst wenn das Profil etwas anderes empfiehlt. Beende nach der Termin- oder Folgeschrittsequenz.",
   "simulation_max_turns": 13
 }

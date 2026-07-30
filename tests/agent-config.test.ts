@@ -46,16 +46,27 @@ describe("isolated V2 agent configuration", () => {
     expect(collection.session_conclusion.description).toContain("\"next_learning_goal\"");
   });
 
-  it("limits category improvements to the three most important evidenced levers", () => {
+  it("requires evidenced improvements for every score from one to three and ranks at most three", () => {
     const collection = config.platform_settings.data_collection;
     const scoreKeys = ["conversation_opening", "needs_discovery", "value_proposition", "objection_handling", "closing", "language_impact"];
     for (const key of scoreKeys) {
-      expect(collection[`${key}_improvement`].description).toContain("höchstens drei wichtigsten Hebeln");
+      expect(collection[`${key}_improvement`].description).toContain("mit 1, 2 oder 3 bewertet");
       expect(collection[`${key}_improvement`].description).toContain("Alternativformulierung");
       expect(collection[`${key}_improvement`].description).toContain("wörtliche Nutzeraussage");
-      expect(collection[`${key}_improvement`].description).toContain("Priorität ist eindeutig 1, 2 oder 3");
+      expect(collection[`${key}_improvement`].description).toContain("priority eindeutig 1, 2 oder 3");
+      expect(collection[`${key}_improvement`].description).toContain("priority null");
       expect(collection[`${key}_improvement`].description).toContain("JSON-Objekt mit allen Feldern");
     }
+  });
+
+  it("collects event context before asking for readiness", () => {
+    const agent = config.conversation_config.agent;
+    expect(agent.first_message).toContain("Um welche Veranstaltung geht es");
+    expect(agent.first_message).toContain("welchen konkreten Kundenkontext");
+    expect(agent.dynamic_variables.dynamic_variable_placeholders).toHaveProperty("conversation_occasion");
+    expect(agent.dynamic_variables.dynamic_variable_placeholders).toHaveProperty("context_collection_instruction");
+    expect(agent.prompt.prompt).toContain("Erst wenn beide Angaben vorliegen");
+    expect(agent.prompt.prompt).toContain("fragst du wörtlich „Bist du bereit?“");
   });
 
   it("requires the exact spoken start and end markers", () => {

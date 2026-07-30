@@ -5,6 +5,11 @@ import {
   sanitizeSessionStrengths,
   validateCriterionEvaluations,
 } from "@/lib/coaching/evaluation-integrity";
+import {
+  ensureGermanLearningGoal,
+  ensureGermanStrengths,
+  ensureGermanSummary,
+} from "@/lib/coaching/german-output";
 import { recomputeLearningProfiles } from "@/lib/coaching/recompute";
 import { analyzeTranscriptPhases } from "@/lib/coaching/transcript-phases";
 import { extractPostCallAnalysis } from "@/lib/elevenlabs/analysis";
@@ -107,10 +112,18 @@ export async function POST(request: Request) {
         improvement_priority: extracted.improvementPriorities[slug],
       };
     }), transcript, phaseAnalysis);
+    const ratingContext = evaluations.map((evaluation, index) => ({
+      score: evaluation.score,
+      name: criteria[index]?.name,
+    }));
     const acceptedLearningGoal = phaseAnalysis.status === "recognized"
       && evaluations.some((evaluation) => evaluation.score !== null)
-      ? extracted.nextLearningGoal
+      ? ensureGermanLearningGoal(extracted.nextLearningGoal, ratingContext)
       : null;
+    const sessionStrengths = ensureGermanStrengths(
+      sanitizeSessionStrengths(extracted.strengths, phaseAnalysis),
+      ratingContext,
+    );
     const { error: evaluationsError } = await supabase.from("session_evaluations").upsert(evaluations, { onConflict: "session_id,criterion_id" });
     if (evaluationsError) throw evaluationsError;
 
@@ -118,8 +131,8 @@ export async function POST(request: Request) {
       status: "completed",
       duration_seconds: Number.isFinite(duration) && duration >= 0 ? Math.round(duration) : null,
       title: typeof snapshot.title === "string" ? snapshot.title : "Voice-Coaching",
-      summary: extracted.summary,
-      strengths: sanitizeSessionStrengths(extracted.strengths, phaseAnalysis),
+      summary: ensureGermanSummary(extracted.summary, ratingContext),
+      strengths: sessionStrengths,
       next_learning_goal: acceptedLearningGoal,
       transcript,
       completed_at: completedAt,

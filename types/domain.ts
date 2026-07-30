@@ -15,6 +15,8 @@ export interface DynamicVariables {
   user_first_name: string;
   training_type: string;
   scenario: string;
+  conversation_occasion: string;
+  context_collection_instruction: string;
   global_strengths: string;
   global_focus_areas: string;
   training_strengths: string;

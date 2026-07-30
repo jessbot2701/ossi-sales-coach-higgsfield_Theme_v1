@@ -10,6 +10,7 @@ const secretKey = process.env.SUPABASE_SECRET_KEY;
 const elevenLabsKey = process.env.ELEVENLABS_API_KEY;
 const consentVersion = process.env.TRANSCRIPT_CONSENT_VERSION;
 const trainingTypeId = "10000000-0000-0000-0000-000000000001";
+const scenarioId = "12000000-0000-0000-0000-000000000005";
 if (!supabaseUrl || !publishableKey || !secretKey || !elevenLabsKey || !consentVersion) {
   throw new Error("Live-test environment is incomplete.");
 }
@@ -86,6 +87,7 @@ async function startSession(cookie) {
     method: "POST",
     body: JSON.stringify({
       trainingTypeId,
+      scenarioId,
       mode: "surprise",
       consent: true,
       consentVersion,

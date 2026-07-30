@@ -12,6 +12,8 @@ const requiredVariables = [
   "user_first_name",
   "training_type",
   "scenario",
+  "conversation_occasion",
+  "context_collection_instruction",
   "session_mode",
   "session_focus",
   "available_training_focuses",

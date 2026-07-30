@@ -98,6 +98,7 @@ describe("criterion evaluation integrity", () => {
 
   it("keeps a complete category improvement with roleplay evidence", () => {
     const result = validateCriterionEvaluations([evaluation({
+      score: 3,
       recommendation: "Den Einstieg stärker auf den Kundennutzen ausrichten.",
       alternative_formulation: "Wie priorisieren Sie aktuell Ihre Lagerprozesse?",
       improvement_evidence: "Guten Tag, mein Name ist Weiß. Ich rufe wegen Ihrer Lagerprozesse an.",
@@ -113,6 +114,7 @@ describe("criterion evaluation integrity", () => {
 
   it("removes an incomplete category improvement", () => {
     const result = validateCriterionEvaluations([evaluation({
+      score: 3,
       recommendation: "Den Einstieg stärker auf den Kundennutzen ausrichten.",
       alternative_formulation: null,
       improvement_evidence: "Guten Tag, mein Name ist Weiß. Ich rufe wegen Ihrer Lagerprozesse an.",
@@ -120,6 +122,7 @@ describe("criterion evaluation integrity", () => {
     })], transcript)[0];
 
     expect(result).toMatchObject({
+      score: null,
       recommendation: null,
       alternative_formulation: null,
       improvement_evidence: null,
@@ -129,6 +132,7 @@ describe("criterion evaluation integrity", () => {
 
   it("removes a category improvement whose evidence is outside the roleplay", () => {
     const result = validateCriterionEvaluations([evaluation({
+      score: 3,
       recommendation: "Den Einstieg stärker auf den Kundennutzen ausrichten.",
       alternative_formulation: "Wie priorisieren Sie aktuell Ihre Lagerprozesse?",
       improvement_evidence: "Ich bin bereit.",
@@ -138,8 +142,9 @@ describe("criterion evaluation integrity", () => {
     expect(result.recommendation).toBeNull();
   });
 
-  it("stores only the three highest-priority complete improvements", () => {
+  it("stores up to six complete category improvements but ranks only three", () => {
     const result = validateCriterionEvaluations([1, 2, 3, 3].map((priority, index) => evaluation({
+      score: 3,
       reasoning: `Kriterienspezifische Begründung Nummer ${index + 1} für diese Bewertung.`,
       recommendation: `Verbesserung ${index + 1}`,
       alternative_formulation: `Alternative ${index + 1}`,
@@ -147,7 +152,7 @@ describe("criterion evaluation integrity", () => {
       improvement_priority: priority,
     })), transcript);
 
-    expect(result.filter((item) => item.recommendation)).toHaveLength(3);
+    expect(result.filter((item) => item.recommendation)).toHaveLength(4);
     expect(result.map((item) => item.improvement_priority)).toEqual([1, 2, 3, null]);
   });
 

@@ -155,6 +155,18 @@
 .button-table { min-height: 34px !important; padding-inline: 12px !important; border-color: rgba(102, 189, 243, .38); color: #d7efff; background: rgba(22, 140, 227, .08); }
 .button-table:hover { border-color: var(--blue-soft); background: rgba(22, 140, 227, .18); }
 .plain-button { border: 0; color: inherit; background: none; cursor: pointer; font: inherit; }
+.voice-session-locked :is(a, button, input, select, textarea):not([data-voice-session-allowed="true"]) { cursor: not-allowed; opacity: .62; }
+.voice-session-locked [data-voice-session-allowed="true"] { opacity: 1; }
+
+.sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
+
+.admin-user-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.admin-delete-backdrop { position: fixed; z-index: 1000; inset: 0; display: grid; padding: 24px; place-items: center; background: rgba(0, 8, 15, .82); backdrop-filter: blur(8px); }
+.admin-delete-dialog { width: min(100%, 600px); padding: 28px; border: 1px solid rgba(255, 145, 145, .38); border-radius: 18px; color: var(--ink); background: #071b2b; box-shadow: 0 30px 90px rgba(0, 0, 0, .55); }
+.admin-delete-dialog h2 { margin: 0 0 12px; }
+.admin-delete-dialog > p { margin: 0 0 20px; color: var(--muted); line-height: 1.65; }
+.admin-delete-dialog > p strong { color: #ffd0d0; overflow-wrap: anywhere; }
+.admin-delete-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
 
 .dashboard-hero {
   position: relative;
@@ -367,21 +379,33 @@
 .badge.warning { border-color: rgba(255, 197, 91, .32); color: #ffe09b; background: rgba(138, 91, 0, .28); }
 
 .form-stack { display: grid; gap: 15px; }
+.training-config-lock { display: grid; min-width: 0; margin: 0; padding: 0; border: 0; gap: 15px; }
 .training-type-field,
+.scenario-field,
 .mode-field { margin: 0; padding: 0; border: 0; }
 .training-type-field legend,
+.scenario-field legend,
 .mode-field legend { margin-bottom: 8px; color: #eaf5fb; font-size: 13px; font-weight: 700; }
-.training-type-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 9px; }
-.training-type-option { position: relative; display: flex; gap: 11px; min-height: 92px; padding: 14px; border: 1px solid var(--midnight-border); border-radius: 12px; color: var(--ink); background: rgba(7, 27, 44, .72); cursor: pointer; transition: border-color .18s ease, background .18s ease, box-shadow .18s ease; }
-.training-type-option:hover { border-color: rgba(102, 189, 243, .58); background: rgba(16, 46, 69, .92); }
+.training-type-grid,
+.scenario-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 9px; }
+.training-type-option,
+.scenario-option { position: relative; display: flex; gap: 11px; min-height: 92px; padding: 14px; border: 1px solid var(--midnight-border); border-radius: 12px; color: var(--ink); background: rgba(7, 27, 44, .72); cursor: pointer; transition: border-color .18s ease, background .18s ease, box-shadow .18s ease; }
+.training-type-option:hover,
+.scenario-option:hover { border-color: rgba(102, 189, 243, .58); background: rgba(16, 46, 69, .92); }
 .training-type-option:focus-within,
+.scenario-option:focus-within,
 .mode-option:focus-within { outline: 3px solid rgba(102, 189, 243, .3); outline-offset: 2px; }
-.training-type-option.selected { border-color: var(--blue-soft); background: linear-gradient(135deg, rgba(22, 140, 227, .21), rgba(10, 36, 56, .95)); box-shadow: 0 0 0 3px rgba(22, 140, 227, .12); }
+.training-type-option.selected,
+.scenario-option.selected { border-color: var(--blue-soft); background: linear-gradient(135deg, rgba(22, 140, 227, .21), rgba(10, 36, 56, .95)); box-shadow: 0 0 0 3px rgba(22, 140, 227, .12); }
 .training-type-option input,
+.scenario-option input,
 .mode-option input { flex: 0 0 auto; margin-top: 4px; accent-color: var(--blue-soft); }
-.training-type-option span { display: grid; align-content: start; gap: 5px; }
-.training-type-option strong { color: var(--ink); font-size: 15px; line-height: 1.3; }
-.training-type-option small { color: var(--muted); line-height: 1.45; }
+.training-type-option span,
+.scenario-option span { display: grid; align-content: start; gap: 5px; }
+.training-type-option strong,
+.scenario-option strong { color: var(--ink); font-size: 15px; line-height: 1.3; }
+.training-type-option small,
+.scenario-option small { color: var(--muted); line-height: 1.45; }
 .mode-grid { display: grid; gap: 9px; }
 .mode-option { display: flex; gap: 11px; padding: 13px; border: 1px solid var(--midnight-border); border-radius: 11px; color: var(--ink); background: rgba(7, 27, 44, .72); cursor: pointer; transition: border-color .18s ease, background .18s ease, box-shadow .18s ease; }
 .mode-option:hover { border-color: rgba(102, 189, 243, .58); background: rgba(16, 46, 69, .92); }
@@ -1040,7 +1064,11 @@ td small { color: var(--muted); }
   .timeline-content > a { font-size: 17px; }
   .score-card-head { flex-direction: column; }
   .score-card-head > strong { max-width: none; }
-  .training-type-grid { grid-template-columns: 1fr; }
+  .training-type-grid,
+  .scenario-grid { grid-template-columns: 1fr; }
+  .admin-delete-backdrop { padding: 12px; }
+  .admin-delete-dialog { padding: 22px 18px; }
+  .admin-delete-actions { display: grid; }
   .voice-session { min-height: 730px; padding: 20px 12px; }
   .voice-phone { width: min(100%, 340px); border-radius: 43px; }
   .voice-phone-screen { border-radius: 35px; }

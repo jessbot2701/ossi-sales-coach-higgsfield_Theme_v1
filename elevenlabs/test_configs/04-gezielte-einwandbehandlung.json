@@ -13,10 +13,12 @@
     "training_strengths": "ruhige Reaktion",
     "training_focus_areas": "Einwände mit Rückfragen öffnen",
     "recent_session_summaries": "Eine synthetische Übung enthielt nur einen Einwand und endete zu früh.",
-    "current_learning_goal": "Vor jeder Entkräftung eine klärende Rückfrage stellen."
+    "current_learning_goal": "Vor jeder Entkräftung eine klärende Rückfrage stellen.",
+    "conversation_occasion": "Einladung zu einer Kundenveranstaltung",
+    "context_collection_instruction": "Erfrage zuerst Veranstaltung und konkreten Kontext. Wähle anschließend eine passende Kundensituation."
   },
   "chat_history": [],
   "success_condition": "Ossi verrät Rolle und konkrete Einwände nicht vorab, baut den gewählten Fokus Einwandbehandlung aber im Rollenspiel deutlich und mehrfach trainierbar ein. Mindestens zwei glaubwürdige Widerstandsmomente oder eine vertiefte mehrstufige Einwandsequenz müssen entstehen. Ossi reagiert adaptiv auf die Qualität der Behandlung, bleibt realistisch und schenkt keinen Erfolg. Der Fokus darf nicht durch einen anderen Trainingsschwerpunkt ersetzt werden.",
-  "simulation_scenario": "Du bist Tarek im IGZ-Vertrieb und hast ausdrücklich Einwandbehandlung gewählt. Frage vor dem Start nicht nach einem konkreten Einwand, sondern beginne das Gespräch. Behandle auftretende Einwände jeweils mit einer klärenden Rückfrage, fasse das Motiv zusammen und antworte lösungsorientiert. Versuche nach dem ersten Widerstand weiter im Gespräch zu bleiben, damit der Schwerpunkt mehrfach trainiert werden kann. Beende nach mehreren Widerstandsmomenten.",
+  "simulation_scenario": "Wenn Ossi nach Veranstaltung und Kontext fragt, nenne als Veranstaltung die „Innovation Days“ und als Kontext einen Erstkontakt zu einem SAP-Logistik-Verantwortlichen in einem laufenden S/4-Projekt. Bestätige erst die anschließende Bereitschaftsfrage. Du bist Tarek im IGZ-Vertrieb und hast ausdrücklich Einwandbehandlung gewählt. Frage vor dem Start nicht nach einem konkreten Einwand, sondern beginne das Gespräch. Behandle auftretende Einwände jeweils mit einer klärenden Rückfrage, fasse das Motiv zusammen und antworte lösungsorientiert. Versuche nach dem ersten Widerstand weiter im Gespräch zu bleiben, damit der Schwerpunkt mehrfach trainiert werden kann. Beende nach mehreren Widerstandsmomenten.",
   "simulation_max_turns": 15
 }

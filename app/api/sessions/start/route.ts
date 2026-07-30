@@ -8,6 +8,7 @@ import type { DynamicVariables } from "@/types/domain";
 
 const schema = z.object({
   trainingTypeId: z.guid(),
+  scenarioId: z.guid(),
   mode: z.enum(["surprise", "focus"]),
   focusCriterionId: z.guid().optional(),
   consent: z.literal(true),
@@ -55,14 +56,17 @@ export async function POST(request: Request) {
 
     const [{ data: scenario }, { data: versions }] = await Promise.all([
       supabase.from("scenarios")
-        .select("id,title,description,agent_config,is_active,training_type_id,training_type:training_types(id,name,is_active)")
-        .eq("slug", "coach_surprise").eq("training_type_id", input.trainingTypeId).maybeSingle(),
+        .select("id,title,description,agent_config,is_active,is_user_selectable,training_type_id,training_type:training_types(id,name,is_active)")
+        .eq("id", input.scenarioId)
+        .eq("training_type_id", input.trainingTypeId)
+        .eq("is_user_selectable", true)
+        .maybeSingle(),
       supabase.from("training_type_versions")
         .select("id,elevenlabs_agent_id,elevenlabs_branch_id,version_number,is_active")
         .eq("training_type_id", input.trainingTypeId),
     ]);
     const trainingType = Array.isArray(scenario?.training_type) ? scenario?.training_type[0] : scenario?.training_type;
-    if (!scenario || !scenario.is_active || !trainingType?.is_active) throw new ApiError(404, "Das gewählte Szenario ist nicht verfügbar.", "scenario_unavailable");
+    if (!scenario || !scenario.is_active || !scenario.is_user_selectable || !trainingType?.is_active) throw new ApiError(404, "Das gewählte Szenario ist nicht verfügbar.", "scenario_unavailable");
 
     const version = versions?.find((item) => item.is_active);
     if (!version) throw new ApiError(409, "Für diese Trainingsart ist keine aktive Agentenversion hinterlegt.", "agent_unavailable");
@@ -82,11 +86,22 @@ export async function POST(request: Request) {
     const globalProfile = (learning ?? []).find((item) => item.training_type_id === null);
     const typeProfile = (learning ?? []).find((item) => item.training_type_id === input.trainingTypeId);
     const recentSummaries = (recent ?? []).map((item) => item.summary).join(" | ");
+    const scenarioConfig = scenario.agent_config && typeof scenario.agent_config === "object" && !Array.isArray(scenario.agent_config)
+      ? scenario.agent_config as Record<string, unknown>
+      : {};
+    const contextQuestions = typeof scenarioConfig.context_questions === "string"
+      ? scenarioConfig.context_questions.slice(0, 2_000)
+      : "Erfrage vor der Bereitschaftsfrage den konkreten Gesprächskontext.";
+    const roleplaySetup = typeof scenarioConfig.roleplay_setup === "string"
+      ? scenarioConfig.roleplay_setup.slice(0, 2_000)
+      : "Wähle eine zum Gesprächsanlass passende realistische Kundensituation.";
 
     const dynamicVariables: DynamicVariables = {
       user_first_name: (profile?.display_name || user.displayName).trim().split(/\s+/)[0],
       training_type: trainingType.name,
       scenario: scenario.title,
+      conversation_occasion: scenario.title,
+      context_collection_instruction: `${contextQuestions} ${roleplaySetup}`,
       global_strengths: listText(globalProfile?.strengths),
       global_focus_areas: listText(globalProfile?.focus_areas),
       training_strengths: listText(typeProfile?.strengths),

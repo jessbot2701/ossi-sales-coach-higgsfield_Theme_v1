@@ -1,13 +1,43 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { readImplicitSession } from "@/lib/supabase/implicit-session";
 
 export function SetPasswordForm() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [preparingLink, setPreparingLink] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+
+    async function prepareLink() {
+      const implicitSession = readImplicitSession(window.location.hash);
+      if (!implicitSession) {
+        if (active) setPreparingLink(false);
+        return;
+      }
+
+      const { error: sessionError } = await createClient().auth.setSession({
+        access_token: implicitSession.accessToken,
+        refresh_token: implicitSession.refreshToken,
+      });
+      if (!active) return;
+
+      if (sessionError) {
+        setError("Der Einladungslink ist ungültig oder bereits verwendet. Bitte fordere einen neuen Passwort-Link an.");
+      } else {
+        window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+      }
+      setPreparingLink(false);
+    }
+
+    void prepareLink();
+    return () => { active = false; };
+  }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -28,7 +58,9 @@ export function SetPasswordForm() {
       <div className="field"><label htmlFor="password">Neues Passwort</label><input id="password" name="password" type="password" minLength={10} autoComplete="new-password" required /></div>
       <div className="field"><label htmlFor="confirmation">Passwort wiederholen</label><input id="confirmation" name="confirmation" type="password" minLength={10} autoComplete="new-password" required /></div>
       {error && <p className="form-message error" role="alert">{error}</p>}
-      <button className="button button-primary" disabled={loading}>{loading ? "Speichern …" : "Passwort festlegen"}</button>
+      <button className="button button-primary" disabled={loading || preparingLink}>
+        {preparingLink ? "Einladungslink wird geprüft …" : loading ? "Speichern …" : "Passwort festlegen"}
+      </button>
     </form>
   );
 }

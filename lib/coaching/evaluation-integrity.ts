@@ -21,7 +21,7 @@ type CompleteImprovement = {
   improvement_priority?: number | null;
 };
 
-const MAX_IMPROVEMENTS = 3;
+const MAX_PRIORITY_IMPROVEMENTS = 3;
 
 function normalized(value: string) {
   return value
@@ -57,17 +57,19 @@ export function hasCompleteImprovement(evaluation: CompleteImprovement) {
     && typeof evaluation.alternative_formulation === "string"
     && evaluation.alternative_formulation.trim().length > 0
     && typeof evaluation.improvement_evidence === "string"
-    && evaluation.improvement_evidence.trim().length > 0
-    && Number.isInteger(evaluation.improvement_priority)
-    && Number(evaluation.improvement_priority) >= 1
-    && Number(evaluation.improvement_priority) <= MAX_IMPROVEMENTS;
+    && evaluation.improvement_evidence.trim().length > 0;
 }
 
 export function selectSessionImprovements<T extends CompleteImprovement>(evaluations: T[]) {
   return evaluations
-    .filter(hasCompleteImprovement)
+    .filter((evaluation) => (
+      hasCompleteImprovement(evaluation)
+      && Number.isInteger(evaluation.improvement_priority)
+      && Number(evaluation.improvement_priority) >= 1
+      && Number(evaluation.improvement_priority) <= MAX_PRIORITY_IMPROVEMENTS
+    ))
     .sort((a, b) => Number(a.improvement_priority) - Number(b.improvement_priority))
-    .slice(0, MAX_IMPROVEMENTS);
+    .slice(0, MAX_PRIORITY_IMPROVEMENTS);
 }
 
 export function sanitizeSessionStrengths(value: string | null, phaseAnalysis: TranscriptPhaseAnalysis) {
@@ -76,7 +78,7 @@ export function sanitizeSessionStrengths(value: string | null, phaseAnalysis: Tr
     .split(/\r?\n|;|,\s+/)
     .map((item) => item.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "").trim())
     .filter(Boolean)
-    .slice(0, MAX_IMPROVEMENTS);
+    .slice(0, MAX_PRIORITY_IMPROVEMENTS);
 }
 
 export function validateCriterionEvaluations<T extends CriterionEvaluation>(
@@ -127,23 +129,42 @@ export function validateCriterionEvaluations<T extends CriterionEvaluation>(
     const hasRoleplayImprovementEvidence = hasCompleteImprovement(evaluation)
       && userMessages.some((message) => comparableMatch(evaluation.improvement_evidence as string, message));
 
-    return hasRoleplayImprovementEvidence ? rating : withoutImprovement(rating);
+    const lowScore = rating.score !== null && rating.score >= 1 && rating.score <= 3;
+    if (!lowScore) return withoutImprovement(rating);
+    if (hasRoleplayImprovementEvidence) return rating;
+
+    return withoutImprovement({
+      ...rating,
+      score: null,
+      reasoning: null,
+      evidence: null,
+    });
   });
 
   const acceptedImprovementIndexes = validated
     .map((evaluation, index) => ({ evaluation, index }))
     .filter(({ evaluation }) => hasCompleteImprovement(evaluation))
     .sort((a, b) => (
-      Number(a.evaluation.improvement_priority) - Number(b.evaluation.improvement_priority)
+      (
+        Number.isInteger(a.evaluation.improvement_priority)
+          ? Number(a.evaluation.improvement_priority)
+          : Number.POSITIVE_INFINITY
+      ) - (
+        Number.isInteger(b.evaluation.improvement_priority)
+          ? Number(b.evaluation.improvement_priority)
+          : Number.POSITIVE_INFINITY
+      )
+      || Number(a.evaluation.score) - Number(b.evaluation.score)
       || a.index - b.index
     ))
-    .slice(0, MAX_IMPROVEMENTS);
+    .slice(0, MAX_PRIORITY_IMPROVEMENTS);
   const accepted = new Map(acceptedImprovementIndexes.map(({ index }, rank) => [index, rank + 1]));
 
   return validated.map((evaluation, index) => {
     const normalizedPriority = accepted.get(index);
-    return normalizedPriority
-      ? { ...evaluation, improvement_priority: normalizedPriority }
-      : withoutImprovement(evaluation);
+    return {
+      ...evaluation,
+      improvement_priority: normalizedPriority ?? null,
+    };
   });
 }

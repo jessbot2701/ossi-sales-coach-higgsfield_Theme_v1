@@ -23,7 +23,8 @@
     "test:agent:smoke": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/elevenlabs-agent-release.mjs smoke",
     "release:agent": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/elevenlabs-agent-release.mjs release",
     "maintenance:evaluations:dry-run": "node --experimental-strip-types --env-file-if-exists=.env.local scripts/cleanup-roleplay-evaluations.mts --dry-run",
-    "maintenance:evaluations:apply": "node --experimental-strip-types --env-file-if-exists=.env.local scripts/cleanup-roleplay-evaluations.mts --apply"
+    "maintenance:evaluations:apply": "node --experimental-strip-types --env-file-if-exists=.env.local scripts/cleanup-roleplay-evaluations.mts --apply",
+    "maintenance:backfill:christian-20260729": "node --experimental-strip-types --env-file-if-exists=.env.local scripts/backfill-christian-20260729.mts"
   },
   "dependencies": {
     "@elevenlabs/react": "1.10.1",

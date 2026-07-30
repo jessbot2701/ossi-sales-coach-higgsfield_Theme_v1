@@ -11,6 +11,7 @@ const secretKey = process.env.SUPABASE_SECRET_KEY;
 const elevenLabsKey = process.env.ELEVENLABS_API_KEY;
 const consentVersion = process.env.TRANSCRIPT_CONSENT_VERSION;
 const trainingTypeId = "10000000-0000-0000-0000-000000000001";
+const scenarioId = "12000000-0000-0000-0000-000000000005";
 const objectionCriterionId = "21000000-0000-0000-0000-000000000004";
 const closingCriterionId = "21000000-0000-0000-0000-000000000005";
 const startMarker = "Rollenspiel beginnt.";
@@ -131,6 +132,7 @@ async function appRequest(path, cookie, options = {}, allowError = false) {
 async function startSession(testCase, cookie) {
   const payload = {
     trainingTypeId,
+    scenarioId,
     mode: testCase.mode,
     consent: true,
     consentVersion,

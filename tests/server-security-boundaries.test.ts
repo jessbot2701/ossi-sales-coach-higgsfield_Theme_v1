@@ -41,7 +41,10 @@ describe("server security boundaries", () => {
     expect(webhook).toContain("alternative_formulation: extracted.alternativesByCriterion[slug]");
     expect(webhook).toContain("improvement_evidence: extracted.improvementEvidenceByCriterion[slug]");
     expect(webhook).toContain("improvement_priority: extracted.improvementPriorities[slug]");
-    expect(webhook).toContain("strengths: sanitizeSessionStrengths");
+    expect(webhook).toContain("strengths: sessionStrengths");
+    expect(webhook).toContain("ensureGermanStrengths");
+    expect(webhook).toContain("ensureGermanSummary");
+    expect(webhook).toContain("ensureGermanLearningGoal");
     expect(webhook).toContain("next_learning_goal: acceptedLearningGoal");
     expect(webhook).toContain("validateCriterionEvaluations");
     expect(webhook).not.toContain("extracted.feedback[slug] ?? extracted.improvements");

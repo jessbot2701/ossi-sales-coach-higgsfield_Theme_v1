@@ -7,13 +7,16 @@ import {
   analyzeTranscriptPhases,
   type TranscriptPhase,
 } from "@/lib/coaching/transcript-phases";
-import { selectSessionImprovements } from "@/lib/coaching/evaluation-integrity";
+import {
+  hasCompleteImprovement,
+  selectSessionImprovements,
+} from "@/lib/coaching/evaluation-integrity";
+import { formatAppDate, formatAppTime } from "@/lib/date-time";
 import { createClient } from "@/lib/supabase/server";
 
 type Turn = { role?: string; message?: string };
 type ScoreTone = "neutral" | "low" | "medium" | "high";
 
-const SESSION_TIME_ZONE = "Europe/Berlin";
 const statusLabel: Record<string, string> = {
   created: "Vorbereitet",
   active: "Aktiv",
@@ -104,26 +107,14 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
   const transcriptPhases = analyzeTranscriptPhases(transcript);
   const sortedEvaluations = [...(evaluations ?? [])].sort((a, b) => { const ac = Array.isArray(a.criterion) ? a.criterion[0] : a.criterion; const bc = Array.isArray(b.criterion) ? b.criterion[0] : b.criterion; return Number(ac?.sort_order) - Number(bc?.sort_order); });
   const improvements = selectSessionImprovements(sortedEvaluations);
-  const improvementCriterionIds = new Set(improvements.flatMap((item) => {
-    const criterion = Array.isArray(item.criterion) ? item.criterion[0] : item.criterion;
-    return criterion?.id ? [criterion.id] : [];
-  }));
   const sessionStrengths = Array.isArray(session.strengths)
     ? session.strengths.filter((item): item is string => typeof item === "string" && item.trim().length > 0).slice(0, 3)
     : [];
   const nextLearningGoal = session.next_learning_goal
     || learning?.next_learning_goal
     || "Wird nach der Auswertung festgelegt.";
-  const sessionStartedAt = new Date(session.created_at);
-  const sessionDate = new Intl.DateTimeFormat("de-DE", {
-    dateStyle: "long",
-    timeZone: SESSION_TIME_ZONE,
-  }).format(sessionStartedAt);
-  const sessionTime = new Intl.DateTimeFormat("de-DE", {
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: SESSION_TIME_ZONE,
-  }).format(sessionStartedAt);
+  const sessionDate = formatAppDate(session.created_at, "long");
+  const sessionTime = formatAppTime(session.created_at);
 
   return (
     <>
@@ -231,7 +222,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
                   const name = criterion?.name || "Kriterium";
                   const reasoning = item.reasoning?.trim();
                   const evidence = item.evidence?.trim();
-                  const hasImprovement = !!criterion?.id && improvementCriterionIds.has(criterion.id);
+                  const hasImprovement = hasCompleteImprovement(item);
                   const presentation = scorePresentation(item.score);
 
                   return (
@@ -271,7 +262,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
                         <div className="category-improvement">
                           <div className="category-improvement-heading">
                             <strong>Verbesserung</strong>
-                            <span>Hebel {item.improvement_priority}</span>
+                            <span>{item.improvement_priority ? `Hebel ${item.improvement_priority}` : "Kategorie-Hinweis"}</span>
                           </div>
                           <p>{item.recommendation}</p>
                           <blockquote>

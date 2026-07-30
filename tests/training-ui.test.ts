@@ -31,6 +31,17 @@ describe("training launcher UI", () => {
     expect(styles).toMatch(/\.voice-status\.connecting i \{[^}]*#f1bd58/);
   });
 
+  it("places the conversation occasion between training type and entry mode", () => {
+    const trainingType = launcher.indexOf("<legend>Trainingsart</legend>");
+    const scenario = launcher.indexOf("<legend>Gesprächsanlass</legend>");
+    const mode = launcher.indexOf("<legend>Wie möchtest du einsteigen?</legend>");
+    expect(trainingType).toBeGreaterThan(-1);
+    expect(scenario).toBeGreaterThan(trainingType);
+    expect(mode).toBeGreaterThan(scenario);
+    expect(launcher).toContain("scenarioId,");
+    expect(styles).toContain(".scenario-option.selected");
+  });
+
   it("places the functional start and stop controls inside the voice phone", () => {
     expect(launcher).toContain('id="training-config-form"');
     expect(launcher).toContain('className={`voice-phone ');

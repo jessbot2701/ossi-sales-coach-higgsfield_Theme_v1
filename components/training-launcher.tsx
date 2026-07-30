@@ -1,13 +1,20 @@
 "use client";
 
-import { ConversationProvider, useConversationControls, useConversationStatus } from "@elevenlabs/react";
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
+import { useAppConversation } from "@/components/app-conversation-provider";
 import { OssiPortrait } from "@/components/ossi-portrait";
 import type { DynamicVariables } from "@/types/domain";
 
 type TrainingMode = "surprise" | "focus";
 type TrainingType = { id: string; name: string; description: string };
+type Scenario = {
+  id: string;
+  training_type_id: string;
+  title: string;
+  description: string;
+  sort_order: number;
+};
 type Criterion = {
   id: string;
   training_type_id: string;
@@ -33,19 +40,21 @@ function recommendedCriterion(criteria: Criterion[], profiles: LearningProfile[]
   return criteria.find((criterion) => recommendations.includes(competencyName(criterion))) ?? criteria[0] ?? null;
 }
 
-function Launcher({ trainingTypes, criteria, learningProfiles, consentVersion, initialMode }: {
+function Launcher({ trainingTypes, scenarios, criteria, learningProfiles, consentVersion, initialMode }: {
   trainingTypes: TrainingType[];
+  scenarios: Scenario[];
   criteria: Criterion[];
   learningProfiles: LearningProfile[];
   consentVersion: string;
   initialMode: TrainingMode;
 }) {
-  const { startSession, endSession } = useConversationControls();
-  const { status } = useConversationStatus();
+  const { startSession, endSession, status, isLocked } = useAppConversation();
   const initialTypeId = trainingTypes[0]?.id ?? "";
+  const initialScenarios = scenarios.filter((scenario) => scenario.training_type_id === initialTypeId);
   const initialCriteria = criteria.filter((criterion) => criterion.training_type_id === initialTypeId);
   const initialRecommendation = recommendedCriterion(initialCriteria, learningProfiles, initialTypeId);
   const [trainingTypeId, setTrainingTypeId] = useState(initialTypeId);
+  const [scenarioId, setScenarioId] = useState(initialScenarios[0]?.id ?? "");
   const [mode, setMode] = useState<TrainingMode>(initialMode);
   const [focusCriterionId, setFocusCriterionId] = useState(initialRecommendation?.id ?? "");
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -53,6 +62,7 @@ function Launcher({ trainingTypes, criteria, learningProfiles, consentVersion, i
   const [error, setError] = useState<string | null>(null);
   const [preparing, setPreparing] = useState(false);
   const [consent, setConsent] = useState(false);
+  const filteredScenarios = scenarios.filter((scenario) => scenario.training_type_id === trainingTypeId);
   const filteredCriteria = criteria.filter((criterion) => criterion.training_type_id === trainingTypeId);
   const recommendation = recommendedCriterion(filteredCriteria, learningProfiles, trainingTypeId);
   const typeProfile = learningProfiles.find((profile) => profile.training_type_id === trainingTypeId)
@@ -64,6 +74,7 @@ function Launcher({ trainingTypes, criteria, learningProfiles, consentVersion, i
   function changeTrainingType(nextTypeId: string) {
     const nextCriteria = criteria.filter((criterion) => criterion.training_type_id === nextTypeId);
     setTrainingTypeId(nextTypeId);
+    setScenarioId(scenarios.find((scenario) => scenario.training_type_id === nextTypeId)?.id ?? "");
     setFocusCriterionId(recommendedCriterion(nextCriteria, learningProfiles, nextTypeId)?.id ?? "");
   }
 
@@ -77,6 +88,7 @@ function Launcher({ trainingTypes, criteria, learningProfiles, consentVersion, i
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           trainingTypeId,
+          scenarioId,
           mode,
           focusCriterionId: mode === "focus" ? focusCriterionId : undefined,
           consent,
@@ -106,13 +118,22 @@ function Launcher({ trainingTypes, criteria, learningProfiles, consentVersion, i
 
   return (
     <div className="portal-grid training-grid">
-      <section className="portal-card training-config"><span className="card-label-app">Vorbereitung</span><h2>Training konfigurieren</h2><form id="training-config-form" className="form-stack" onSubmit={submit}>
+      <section className="portal-card training-config"><span className="card-label-app">Vorbereitung</span><h2>Training konfigurieren</h2><form id="training-config-form" className="form-stack" onSubmit={submit}><fieldset className="training-config-lock" disabled={isLocked}>
         <fieldset className="training-type-field"><legend>Trainingsart</legend><div className="training-type-grid">
           {trainingTypes.map((type) => {
             const descriptionId = `training-type-${type.id}-description`;
             return <label className={`training-type-option ${trainingTypeId === type.id ? "selected" : ""}`} key={type.id}>
               <input type="radio" name="trainingType" value={type.id} checked={trainingTypeId === type.id} onChange={() => changeTrainingType(type.id)} aria-describedby={descriptionId} />
               <span><strong>{type.name}</strong><small id={descriptionId}>{type.description}</small></span>
+            </label>;
+          })}
+        </div></fieldset>
+        <fieldset className="scenario-field"><legend>Gesprächsanlass</legend><div className="scenario-grid">
+          {filteredScenarios.map((scenario) => {
+            const descriptionId = `scenario-${scenario.id}-description`;
+            return <label className={`scenario-option ${scenarioId === scenario.id ? "selected" : ""}`} key={scenario.id}>
+              <input type="radio" name="scenario" value={scenario.id} checked={scenarioId === scenario.id} onChange={() => setScenarioId(scenario.id)} aria-describedby={descriptionId} />
+              <span><strong>{scenario.title}</strong><small id={descriptionId}>{scenario.description}</small></span>
             </label>;
           })}
         </div></fieldset>
@@ -126,7 +147,7 @@ function Launcher({ trainingTypes, criteria, learningProfiles, consentVersion, i
           <p id="transcript-consent-status" className="consent-status" aria-live="polite">{consent ? "Einwilligung erteilt – die Voice-Session kann gestartet werden." : "Ohne Einwilligung kann keine Voice-Session gestartet werden."}</p>
         </div>
         {error && <p className="form-message error" role="alert">{error}</p>}{message && <p className="form-message" role="status">{message}</p>}
-      </form></section>
+      </fieldset></form></section>
       <aside className="voice-session portal-card" aria-label="Voice-Phone">
         <div className={`voice-phone ${voiceState}`}>
           <span className="voice-phone-side voice-phone-side-volume" aria-hidden="true" />
@@ -152,7 +173,7 @@ function Launcher({ trainingTypes, criteria, learningProfiles, consentVersion, i
             <div className="sound-bars" aria-hidden="true">{Array.from({ length: 12 }, (_, index) => <i key={index} />)}</div>
             <div className="voice-phone-controls">
               {status === "connected" ? (
-                <button className="voice-call-button hangup" type="button" onClick={() => endSession()} aria-label="Gespräch beenden">
+                <button className="voice-call-button hangup" type="button" onClick={() => endSession()} aria-label="Gespräch beenden" data-voice-session-allowed="true">
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 10.8c3.5-1.7 7.3-1.7 10.8 0l1.6.8c.7.4 1 1.2.7 2l-.8 2.1c-.3.7-1 1.1-1.8.9l-2.5-.7a1.5 1.5 0 0 1-1.1-1.4v-.8a11.8 11.8 0 0 0-3 0v.8c0 .7-.5 1.3-1.1 1.4l-2.5.7c-.7.2-1.5-.2-1.8-.9l-.8-2.1c-.3-.8 0-1.6.7-2l1.6-.8Z" /></svg>
                 </button>
               ) : (
@@ -160,7 +181,7 @@ function Launcher({ trainingTypes, criteria, learningProfiles, consentVersion, i
                   className="voice-call-button start"
                   type="submit"
                   form="training-config-form"
-                  disabled={!consent || preparing || !filteredCriteria.length || (mode === "focus" && !focusCriterionId)}
+                  disabled={!consent || preparing || !scenarioId || !filteredCriteria.length || (mode === "focus" && !focusCriterionId)}
                   aria-label="Voice-Training starten"
                   aria-busy={preparing || status === "connecting"}
                 >
@@ -182,10 +203,11 @@ function Launcher({ trainingTypes, criteria, learningProfiles, consentVersion, i
 
 export function TrainingLauncher(props: {
   trainingTypes: TrainingType[];
+  scenarios: Scenario[];
   criteria: Criterion[];
   learningProfiles: LearningProfile[];
   consentVersion: string;
   initialMode: TrainingMode;
 }) {
-  return <ConversationProvider serverLocation="eu-residency"><Launcher {...props} /></ConversationProvider>;
+  return <Launcher {...props} />;
 }

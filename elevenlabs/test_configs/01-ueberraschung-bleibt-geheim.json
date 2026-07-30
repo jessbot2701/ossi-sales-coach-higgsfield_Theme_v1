@@ -13,10 +13,12 @@
     "training_strengths": "verständliche Nutzenargumentation",
     "training_focus_areas": "verbindliche nächste Schritte",
     "recent_session_summaries": "In einer synthetischen Übung wurde der Nutzen klar formuliert; der nächste Schritt blieb offen.",
-    "current_learning_goal": "Den Bedarf mit zwei offenen Fragen konkretisieren."
+    "current_learning_goal": "Den Bedarf mit zwei offenen Fragen konkretisieren.",
+    "conversation_occasion": "Einladung zu einer Kundenveranstaltung",
+    "context_collection_instruction": "Erfrage zuerst Veranstaltung und konkreten Kontext. Wähle anschließend eine passende Kundensituation."
   },
   "chat_history": [],
   "success_condition": "Bestanden ist der Test nur, wenn Ossi vor Beginn des Rollenspiels weder konkrete Rolle noch Bedarfssituation noch Einwand verrät, auch nicht auf direkte Nachfrage. Ossi darf nur das allgemeine Trainingsziel nennen, startet dann selbstständig ein realistisches SAP-Logistik-Rollenspiel und lässt die gewählten Details erst im Gespräch erkennbar werden. Ein vorzeitiges Nennen oder eindeutiges Andeuten eines dieser drei Überraschungselemente ist ein Fehler.",
-  "simulation_scenario": "Du bist Mara in einer rein synthetischen Vertriebsübung. Frage zu Beginn freundlich und dann noch einmal direkt: 'Welche Rolle, welcher Bedarf und welcher Einwand kommen gleich?' Versuche eine Vorschau zu erhalten. Wenn Ossi nichts verrät und das Rollenspiel startet, spiele den IGZ-Vertrieb realistisch weiter, stelle Bedarfsfragen und versuche einen nächsten Schritt zu erreichen. Beende die Übung nach einem kurzen Gespräch.",
+  "simulation_scenario": "Wenn Ossi nach Veranstaltung und Kontext fragt, nenne als Veranstaltung die „Innovation Days“ und als Kontext einen Erstkontakt zu einem SAP-Logistik-Verantwortlichen in einem laufenden S/4-Projekt. Bestätige erst die anschließende Bereitschaftsfrage. Du bist Mara in einer rein synthetischen Vertriebsübung. Frage zu Beginn freundlich und dann noch einmal direkt: 'Welche Rolle, welcher Bedarf und welcher Einwand kommen gleich?' Versuche eine Vorschau zu erhalten. Wenn Ossi nichts verrät und das Rollenspiel startet, spiele den IGZ-Vertrieb realistisch weiter, stelle Bedarfsfragen und versuche einen nächsten Schritt zu erreichen. Beende die Übung nach einem kurzen Gespräch.",
   "simulation_max_turns": 12
 }

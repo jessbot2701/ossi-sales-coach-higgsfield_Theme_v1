@@ -29,7 +29,7 @@ const admin = createClient(supabaseUrl, secretKey, {
 
 const trainingTypeId = "10000000-0000-0000-0000-000000000001";
 const trainingTypeVersionId = "11000000-0000-0000-0000-000000000001";
-const scenarioId = "12000000-0000-0000-0000-000000000004";
+const scenarioId = "12000000-0000-0000-0000-000000000005";
 const runId = new Date().toISOString().replace(/\D/g, "").slice(0, 14);
 const normalEmail = `codex-functional-${runId}@example.com`;
 const normalPassword = "Ossi-Functional-2026!";
@@ -121,7 +121,7 @@ async function createCompletedSession(userId, title, {
     criteria.map((criterion, index) => ({
       session_id: session.id,
       criterion_id: criterion.id,
-      score: 3,
+      score: index < improvementCount ? 3 : 4,
       reasoning: `Testbegründung ${index + 1}`,
       evidence: index === 0
         ? "Guten Tag, hier ist der Vertrieb von IGZ."
@@ -450,7 +450,7 @@ try {
     const result = await browserJson(normalPage, "/api/sessions/start", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ trainingTypeId, mode: "surprise", consent: false, consentVersion }),
+      body: JSON.stringify({ trainingTypeId, scenarioId, mode: "surprise", consent: false, consentVersion }),
     });
     assert(result.status === 400, `Erwartet 400, erhalten ${result.status}`);
     return result;
@@ -460,7 +460,7 @@ try {
     const result = await browserJson(normalPage, "/api/sessions/start", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ trainingTypeId, mode: "surprise", consent: true, consentVersion: "alt" }),
+      body: JSON.stringify({ trainingTypeId, scenarioId, mode: "surprise", consent: true, consentVersion: "alt" }),
     });
     assert(result.status === 400 && result.body?.code === "invalid_consent", JSON.stringify(result));
     return result;
@@ -470,7 +470,7 @@ try {
     const result = await browserJson(normalPage, "/api/sessions/start", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ trainingTypeId, mode: "focus", consent: true, consentVersion }),
+      body: JSON.stringify({ trainingTypeId, scenarioId, mode: "focus", consent: true, consentVersion }),
     });
     assert(result.status === 400, `Erwartet 400, erhalten ${result.status}`);
     return result;
@@ -480,7 +480,7 @@ try {
     const result = await browserJson(normalPage, "/api/sessions/start", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ trainingTypeId, mode: "surprise", consent: true, consentVersion }),
+      body: JSON.stringify({ trainingTypeId, scenarioId, mode: "surprise", consent: true, consentVersion }),
     });
     assert(result.status === 200, JSON.stringify(result.body));
     assert(result.body?.sessionId && result.body?.signedUrl && result.body?.dynamicVariables, "Antwort unvollständig.");
@@ -494,7 +494,7 @@ try {
     const result = await browserJson(normalPage, "/api/sessions/start", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ trainingTypeId, mode: "surprise", consent: true, consentVersion }),
+      body: JSON.stringify({ trainingTypeId, scenarioId, mode: "surprise", consent: true, consentVersion }),
     });
     assert(result.status === 409 && result.body?.code === "session_already_open", JSON.stringify(result));
     return result;
@@ -560,7 +560,7 @@ try {
     const result = await browserJson(normalPage, "/api/sessions/start", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ trainingTypeId, mode: "surprise", consent: true, consentVersion }),
+      body: JSON.stringify({ trainingTypeId, scenarioId, mode: "surprise", consent: true, consentVersion }),
     });
     assert(result.status === 429 && result.body?.code === "session_rate_limited", JSON.stringify(result));
     await admin.from("coaching_sessions").delete().in("id", (data ?? []).map((row) => row.id));
@@ -606,7 +606,11 @@ try {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ isActive: false }),
     });
-    const remove = await browserJson(adminPage, `/api/admin/users/${currentAdmin.id}`, { method: "DELETE" });
+    const remove = await browserJson(adminPage, `/api/admin/users/${currentAdmin.id}`, {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ confirmationEmail: adminEmail }),
+    });
     assert(lock.status === 400 && lock.body?.code === "self_lockout", JSON.stringify(lock));
     assert(remove.status === 400 && remove.body?.code === "self_delete", JSON.stringify(remove));
     return { lock: lock.status, remove: remove.status };
@@ -646,7 +650,11 @@ try {
   cascadeUserId = await createUser(cascadeEmail, cascadePassword, "Codex Cascade User");
   cascadeSessionId = await createCompletedSession(cascadeUserId, "Codex E2E Nutzerlöschung");
   await check("ADMIN-07", "Nutzerlöschung entfernt alle personenbezogenen Daten per Kaskade", async () => {
-    const result = await browserJson(adminPage, `/api/admin/users/${cascadeUserId}`, { method: "DELETE" });
+    const result = await browserJson(adminPage, `/api/admin/users/${cascadeUserId}`, {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ confirmationEmail: cascadeEmail }),
+    });
     assert(result.status === 200 && result.body?.deleted === true, JSON.stringify(result));
     const counts = {
       profiles: await countRows("profiles", "id", cascadeUserId),

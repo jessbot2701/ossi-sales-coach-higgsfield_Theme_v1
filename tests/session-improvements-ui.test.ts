@@ -51,7 +51,8 @@ describe("session improvement presentation", () => {
       expect(page).toContain(label);
     }
     expect(page).toContain("#evaluation-category-");
-    expect(page).toContain("improvementCriterionIds.has");
+    expect(page).toContain("hasCompleteImprovement(item)");
+    expect(page).toContain("Kategorie-Hinweis");
     expect(page).toContain("session.next_learning_goal");
     expect(styles).toContain(".coaching-conclusion-grid");
     expect(styles).toContain(".category-improvement");

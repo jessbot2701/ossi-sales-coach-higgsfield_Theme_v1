@@ -12,6 +12,7 @@ describe("session start protection", () => {
 
   it("accepts deterministic database GUIDs for training configuration references", () => {
     expect(route).toContain("trainingTypeId: z.guid()");
+    expect(route).toContain("scenarioId: z.guid()");
     expect(route).toContain("focusCriterionId: z.guid().optional()");
   });
 
@@ -36,5 +37,12 @@ describe("session start protection", () => {
     expect(route).toContain("const [{ data: scenario }, { data: versions }] = await Promise.all");
     expect(route).toContain('.in("training_type_version_id", typeVersionIds)');
     expect(route.match(/from\("training_type_versions"\)/g)).toHaveLength(1);
+  });
+
+  it("accepts only the selected visible scenario for the selected training type", () => {
+    expect(route).toContain('.eq("id", input.scenarioId)');
+    expect(route).toContain('.eq("training_type_id", input.trainingTypeId)');
+    expect(route).toContain('.eq("is_user_selectable", true)');
+    expect(route).not.toContain('.eq("slug", "coach_surprise")');
   });
 });
