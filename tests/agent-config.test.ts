@@ -90,7 +90,12 @@ describe("isolated V2 agent configuration", () => {
   });
 
   it("disables provider audio retention", () => {
-    expect(config.platform_settings.privacy).toMatchObject({ record_voice: false, zero_retention_mode: true });
+    expect(config.platform_settings.privacy).toMatchObject({
+      record_voice: false,
+      retention_days: 30,
+      delete_transcript_and_pii: false,
+      zero_retention_mode: false,
+    });
     expect(config.platform_settings.workspace_overrides.webhooks.send_audio).toBe(false);
   });
 

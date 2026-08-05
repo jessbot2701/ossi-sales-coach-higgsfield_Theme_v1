@@ -52,11 +52,11 @@ Zusätzliche Kontrollen vor dem Release:
 
 1. Agent-Registry lesen und sicherstellen, dass sie genau einen V2-Agenten enthält.
 2. Remote-Agent read-only abrufen und Agent-/Branch-ID vergleichen.
-3. CLI-Diff prüfen: keine V1-ID, `record_voice=false`, `delete_audio=true`, `send_audio=false`, Auth aktiviert.
+3. CLI-Diff prüfen: keine V1-ID, `record_voice=false`, `retention_days=30`, `delete_transcript_and_pii=false`, `zero_retention_mode=false`, `send_audio=false`, Auth aktiviert.
 4. Nur über `npm run release:agent` die freigegebene V2-Konfiguration pushen.
 5. Post-Call-Webhook für `post_call_transcription` auf `https://<v2-domain>/api/webhooks/elevenlabs` konfigurieren, HMAC aktivieren und keinen Audio-Webhook abonnieren.
 6. Webhook-Secret nur als `ELEVENLABS_WEBHOOK_SECRET` in Vercel speichern.
-7. Wenn Zero Retention im Tarif nicht verfügbar ist, `zero_retention_mode` vor dem Push auf `false` setzen, `delete_audio=true` beibehalten und die minimale zulässige Provider-Aufbewahrung wählen.
+7. Während der Probephase bleiben Transkripte und Analysen 30 Tage als Wiederherstellungs-Fallback bei ElevenLabs gespeichert; Audioaufzeichnung und Audio-Webhooks bleiben deaktiviert. Nach der Probephase die Aufbewahrung erneut bewerten und gegebenenfalls wieder Zero Retention aktivieren.
 
 ## 3. Vercel-Projekt
 

@@ -510,11 +510,11 @@
     "smb_metadata": null,
     "privacy": {
       "record_voice": false,
-      "retention_days": -1,
-      "delete_transcript_and_pii": true,
+      "retention_days": 30,
+      "delete_transcript_and_pii": false,
       "delete_audio": false,
       "apply_to_existing_conversations": false,
-      "zero_retention_mode": true,
+      "zero_retention_mode": false,
       "conversation_history_redaction": {
         "enabled": false,
         "entities": []
