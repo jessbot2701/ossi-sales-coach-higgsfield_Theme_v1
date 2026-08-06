@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useAppConversation } from "@/components/app-conversation-provider";
 import { OssiPortrait } from "@/components/ossi-portrait";
+import { CUSTOM_CONVERSATION_OCCASION_SLUG, MAX_CONVERSATION_OCCASION_LENGTH } from "@/lib/conversation-occasion";
 import type { DynamicVariables } from "@/types/domain";
 
 type TrainingMode = "surprise" | "focus";
@@ -11,6 +12,7 @@ type TrainingType = { id: string; name: string; description: string };
 type Scenario = {
   id: string;
   training_type_id: string;
+  slug: string;
   title: string;
   description: string;
   sort_order: number;
@@ -55,6 +57,7 @@ function Launcher({ trainingTypes, scenarios, criteria, learningProfiles, consen
   const initialRecommendation = recommendedCriterion(initialCriteria, learningProfiles, initialTypeId);
   const [trainingTypeId, setTrainingTypeId] = useState(initialTypeId);
   const [scenarioId, setScenarioId] = useState(initialScenarios[0]?.id ?? "");
+  const [conversationOccasionDraft, setConversationOccasionDraft] = useState("");
   const [mode, setMode] = useState<TrainingMode>(initialMode);
   const [focusCriterionId, setFocusCriterionId] = useState(initialRecommendation?.id ?? "");
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -64,6 +67,9 @@ function Launcher({ trainingTypes, scenarios, criteria, learningProfiles, consen
   const [consent, setConsent] = useState(false);
   const filteredScenarios = scenarios.filter((scenario) => scenario.training_type_id === trainingTypeId);
   const filteredCriteria = criteria.filter((criterion) => criterion.training_type_id === trainingTypeId);
+  const selectedScenario = filteredScenarios.find((scenario) => scenario.id === scenarioId);
+  const usesCustomConversationOccasion = selectedScenario?.slug === CUSTOM_CONVERSATION_OCCASION_SLUG;
+  const cleanedConversationOccasion = conversationOccasionDraft.trim();
   const recommendation = recommendedCriterion(filteredCriteria, learningProfiles, trainingTypeId);
   const typeProfile = learningProfiles.find((profile) => profile.training_type_id === trainingTypeId)
     ?? learningProfiles.find((profile) => profile.training_type_id === null);
@@ -91,6 +97,7 @@ function Launcher({ trainingTypes, scenarios, criteria, learningProfiles, consen
           scenarioId,
           mode,
           focusCriterionId: mode === "focus" ? focusCriterionId : undefined,
+          conversationOccasion: usesCustomConversationOccasion ? cleanedConversationOccasion : undefined,
           consent,
           consentVersion,
         }),
@@ -136,7 +143,26 @@ function Launcher({ trainingTypes, scenarios, criteria, learningProfiles, consen
               <span><strong>{scenario.title}</strong><small id={descriptionId}>{scenario.description}</small></span>
             </label>;
           })}
-        </div></fieldset>
+        </div>
+        {usesCustomConversationOccasion && <div className="field conversation-occasion-field">
+          <label htmlFor="conversationOccasion">Dein Gesprächsanlass</label>
+          <textarea
+            id="conversationOccasion"
+            name="conversationOccasion"
+            value={conversationOccasionDraft}
+            onChange={(event) => setConversationOccasionDraft(event.target.value)}
+            maxLength={MAX_CONVERSATION_OCCASION_LENGTH}
+            rows={5}
+            required
+            placeholder="Zum Beispiel: Gespräch mit einer SAP-Leiterin, die nach einem Lagerumbau ihre EWM-Prozesse neu bewerten möchte."
+            aria-describedby="conversation-occasion-hint conversation-occasion-count"
+          />
+          <div className="conversation-occasion-meta">
+            <small id="conversation-occasion-hint">Beschreibe Anlass und Kundenkontext. Eingaben werden als Nutzerdaten behandelt.</small>
+            <small id="conversation-occasion-count" aria-live="polite">{conversationOccasionDraft.length}/{MAX_CONVERSATION_OCCASION_LENGTH}</small>
+          </div>
+        </div>}
+        </fieldset>
         <fieldset className="mode-field"><legend>Wie möchtest du einsteigen?</legend><div className="mode-grid">
           <label className={`mode-option ${mode === "surprise" ? "selected" : ""}`}><input type="radio" name="mode" value="surprise" checked={mode === "surprise"} onChange={() => setMode("surprise")} /><span><strong>Ossi überrascht mich <small className="badge">Standard</small></strong><small>Ossi wählt Gesprächslage, Einwände und wechselnden Schwerpunkt.</small></span></label>
           <label className={`mode-option ${mode === "focus" ? "selected" : ""}`}><input type="radio" name="mode" value="focus" checked={mode === "focus"} onChange={() => setMode("focus")} /><span><strong>Gezielt trainieren</strong><small>Du bestimmst den Schwerpunkt, das konkrete Szenario bleibt überraschend.</small></span></label>
@@ -181,7 +207,7 @@ function Launcher({ trainingTypes, scenarios, criteria, learningProfiles, consen
                   className="voice-call-button start"
                   type="submit"
                   form="training-config-form"
-                  disabled={!consent || preparing || !scenarioId || !filteredCriteria.length || (mode === "focus" && !focusCriterionId)}
+                  disabled={!consent || preparing || !scenarioId || !filteredCriteria.length || (usesCustomConversationOccasion && !cleanedConversationOccasion) || (mode === "focus" && !focusCriterionId)}
                   aria-label="Voice-Training starten"
                   aria-busy={preparing || status === "connecting"}
                 >

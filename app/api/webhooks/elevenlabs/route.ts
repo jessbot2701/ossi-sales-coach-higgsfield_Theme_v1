@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
-import { apiErrorResponse, ApiError } from "@/lib/api";
+import { apiErrorResponse, ApiError, getErrorMessage } from "@/lib/api";
 import {
   sanitizeSessionStrengths,
   validateCriterionEvaluations,
@@ -46,6 +46,8 @@ function cleanTranscript(value: unknown) {
 }
 
 export async function POST(request: Request) {
+  const startedAt = Date.now();
+  const requestId = request.headers.get("x-vercel-id");
   let conversationId: string | undefined;
   let receiptClaimed = false;
   const supabase = createAdminClient();
@@ -67,6 +69,12 @@ export async function POST(request: Request) {
     const allowedAgents = new Set(requireServerEnv("ELEVENLABS_ALLOWED_AGENT_IDS").split(",").map((id) => id.trim()).filter(Boolean));
     if (!allowedAgents.has(data.agent_id)) throw new ApiError(403, "Der Agent ist für V2 nicht freigegeben.", "invalid_agent");
 
+    console.log(JSON.stringify({
+      level: "info",
+      message: "ElevenLabs webhook processing started",
+      requestId,
+      conversationId,
+    }));
     const payloadHash = createHash("sha256").update(rawBody).digest("hex");
     const { data: claim, error: claimError } = await supabase.rpc("claim_webhook_receipt", {
       receipt_conversation_id: conversationId, receipt_payload_hash: payloadHash,
@@ -143,10 +151,26 @@ export async function POST(request: Request) {
 
     await recomputeLearningProfiles(supabase, session.user_id, version.training_type_id, session.id, acceptedLearningGoal);
     await supabase.rpc("finish_webhook_receipt", { receipt_conversation_id: conversationId, receipt_status: "processed", receipt_error: null });
+    console.log(JSON.stringify({
+      level: "info",
+      message: "ElevenLabs webhook processing completed",
+      requestId,
+      conversationId,
+      sessionId: session.id,
+      durationMs: Date.now() - startedAt,
+    }));
     return NextResponse.json({ received: true, sessionId: session.id });
   } catch (error) {
     if (conversationId && receiptClaimed) {
-      const message = error instanceof Error ? error.message.slice(0, 500) : "Unknown webhook error";
+      const message = getErrorMessage(error, "Unknown webhook error").slice(0, 500);
+      console.error(JSON.stringify({
+        level: "error",
+        message: "ElevenLabs webhook processing failed",
+        requestId,
+        conversationId,
+        error: message,
+        durationMs: Date.now() - startedAt,
+      }));
       await supabase.from("coaching_sessions").update({ status: "failed", processing_error: message }).eq("elevenlabs_conversation_id", conversationId);
       await supabase.rpc("finish_webhook_receipt", { receipt_conversation_id: conversationId, receipt_status: "failed", receipt_error: message });
     }

@@ -45,4 +45,13 @@ describe("session start protection", () => {
     expect(route).toContain('.eq("is_user_selectable", true)');
     expect(route).not.toContain('.eq("slug", "coach_surprise")');
   });
+
+  it("resolves the selected occasion server-side and stores the effective value", () => {
+    expect(route).toContain("conversationOccasion: z.string().optional()");
+    expect(route).toContain("resolveConversationOccasion({");
+    expect(route).toContain('"conversation_occasion_required"');
+    expect(route).toContain('"conversation_occasion_too_long"');
+    expect(route).toContain("conversation_occasion: conversationOccasion");
+    expect(route).toMatch(/scenario_snapshot:[\s\S]*conversationOccasion/);
+  });
 });

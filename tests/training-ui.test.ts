@@ -42,6 +42,18 @@ describe("training launcher UI", () => {
     expect(styles).toContain(".scenario-option.selected");
   });
 
+  it("shows and validates a retained custom occasion draft only for the custom tile", () => {
+    expect(launcher).toContain("CUSTOM_CONVERSATION_OCCASION_SLUG");
+    expect(launcher).toContain('const [conversationOccasionDraft, setConversationOccasionDraft] = useState("")');
+    expect(launcher).toContain("usesCustomConversationOccasion && <div className=\"field conversation-occasion-field\"");
+    expect(launcher).toContain('id="conversationOccasion"');
+    expect(launcher).toContain("maxLength={MAX_CONVERSATION_OCCASION_LENGTH}");
+    expect(launcher).toContain("conversationOccasionDraft.length}/{MAX_CONVERSATION_OCCASION_LENGTH}");
+    expect(launcher).toContain("usesCustomConversationOccasion && !cleanedConversationOccasion");
+    expect(launcher).toContain("conversationOccasion: usesCustomConversationOccasion ? cleanedConversationOccasion : undefined");
+    expect(styles).toContain(".conversation-occasion-meta");
+  });
+
   it("places the functional start and stop controls inside the voice phone", () => {
     expect(launcher).toContain('id="training-config-form"');
     expect(launcher).toContain('className={`voice-phone ');

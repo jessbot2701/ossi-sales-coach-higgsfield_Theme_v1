@@ -33,6 +33,15 @@ describe("server security boundaries", () => {
     expect(webhook).toContain("MAX_TRANSCRIPT_MESSAGE_CHARS");
   });
 
+  it("emits structured webhook lifecycle logs with request correlation", () => {
+    const webhook = source("app/api/webhooks/elevenlabs/route.ts");
+    expect(webhook).toContain("ElevenLabs webhook processing started");
+    expect(webhook).toContain("ElevenLabs webhook processing completed");
+    expect(webhook).toContain("ElevenLabs webhook processing failed");
+    expect(webhook).toContain('request.headers.get("x-vercel-id")');
+    expect(webhook).toContain("durationMs: Date.now() - startedAt");
+  });
+
   it("does not assign general coaching text to individual competencies", () => {
     const webhook = source("app/api/webhooks/elevenlabs/route.ts");
     expect(webhook).toContain("reasoning: extracted.feedback[slug]");

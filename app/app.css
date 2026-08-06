@@ -423,6 +423,10 @@
 .field input::placeholder,
 .field textarea::placeholder { color: #809cac; }
 .field textarea { min-height: 110px; resize: vertical; }
+.conversation-occasion-field { margin-top: 12px; }
+.conversation-occasion-meta { display: flex; justify-content: space-between; gap: 12px; }
+.conversation-occasion-meta small { color: var(--muted); line-height: 1.45; }
+.conversation-occasion-meta small:last-child { flex: 0 0 auto; font-variant-numeric: tabular-nums; }
 .field input:focus,
 .field select:focus,
 .field textarea:focus { outline: 3px solid rgba(102, 189, 243, .3); border-color: var(--blue-soft); }
