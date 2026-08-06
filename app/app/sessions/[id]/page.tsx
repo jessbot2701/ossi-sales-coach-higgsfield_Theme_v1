@@ -7,12 +7,16 @@ import {
   analyzeTranscriptPhases,
   type TranscriptPhase,
 } from "@/lib/coaching/transcript-phases";
+import {
+  hasCompleteImprovement,
+  selectSessionImprovements,
+} from "@/lib/coaching/evaluation-integrity";
+import { formatAppDate, formatAppTime } from "@/lib/date-time";
 import { createClient } from "@/lib/supabase/server";
 
 type Turn = { role?: string; message?: string };
 type ScoreTone = "neutral" | "low" | "medium" | "high";
 
-const SESSION_TIME_ZONE = "Europe/Berlin";
 const statusLabel: Record<string, string> = {
   created: "Vorbereitet",
   active: "Aktiv",
@@ -90,36 +94,27 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
   const supabase = await createClient();
   let sessionQuery = supabase
     .from("coaching_sessions")
-    .select("id,user_id,title,status,summary,transcript,transcript_deleted_at,created_at,completed_at,duration_seconds,processing_error,scenario_snapshot")
+    .select("id,user_id,title,status,summary,strengths,next_learning_goal,transcript,transcript_deleted_at,created_at,completed_at,duration_seconds,processing_error,scenario_snapshot")
     .eq("id", id);
   if (user.role !== "admin") sessionQuery = sessionQuery.eq("user_id", user.id);
   const { data: session } = await sessionQuery.maybeSingle();
   if (!session) notFound();
   const [{ data: evaluations }, { data: learning }] = await Promise.all([
-    supabase.from("session_evaluations").select("score,reasoning,evidence,recommendation,criterion:evaluation_criteria(name,sort_order)").eq("session_id", id),
+    supabase.from("session_evaluations").select("score,reasoning,evidence,recommendation,alternative_formulation,improvement_evidence,improvement_priority,criterion:evaluation_criteria(id,name,sort_order)").eq("session_id", id),
     supabase.from("learning_profiles").select("next_learning_goal").eq("source_session_id", id).eq("user_id", session.user_id).limit(1).maybeSingle(),
   ]);
   const transcript = Array.isArray(session.transcript) ? session.transcript as Turn[] : [];
   const transcriptPhases = analyzeTranscriptPhases(transcript);
   const sortedEvaluations = [...(evaluations ?? [])].sort((a, b) => { const ac = Array.isArray(a.criterion) ? a.criterion[0] : a.criterion; const bc = Array.isArray(b.criterion) ? b.criterion[0] : b.criterion; return Number(ac?.sort_order) - Number(bc?.sort_order); });
-  const repeatedReasoning = new Set(sortedEvaluations.flatMap((item, index, items) => {
-    const value = item.reasoning?.trim();
-    return value && items.some((other, otherIndex) => otherIndex !== index && other.reasoning?.trim() === value) ? [value] : [];
-  }));
-  const repeatedEvidence = new Set(sortedEvaluations.flatMap((item, index, items) => {
-    const value = item.evidence?.trim();
-    return value && items.some((other, otherIndex) => otherIndex !== index && other.evidence?.trim() === value) ? [value] : [];
-  }));
-  const sessionStartedAt = new Date(session.created_at);
-  const sessionDate = new Intl.DateTimeFormat("de-DE", {
-    dateStyle: "long",
-    timeZone: SESSION_TIME_ZONE,
-  }).format(sessionStartedAt);
-  const sessionTime = new Intl.DateTimeFormat("de-DE", {
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: SESSION_TIME_ZONE,
-  }).format(sessionStartedAt);
+  const improvements = selectSessionImprovements(sortedEvaluations);
+  const sessionStrengths = Array.isArray(session.strengths)
+    ? session.strengths.filter((item): item is string => typeof item === "string" && item.trim().length > 0).slice(0, 3)
+    : [];
+  const nextLearningGoal = session.next_learning_goal
+    || learning?.next_learning_goal
+    || "Wird nach der Auswertung festgelegt.";
+  const sessionDate = formatAppDate(session.created_at, "long");
+  const sessionTime = formatAppTime(session.created_at);
 
   return (
     <>
@@ -169,37 +164,56 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
           </section>
         )}
 
-        <section className="portal-card summary-card">
-          <span className="card-label-app">Gespräch in Kürze</span>
-          <h2>Zusammenfassung</h2>
-          <p>{session.summary || "Noch keine Zusammenfassung verfügbar."}</p>
-        </section>
-
-        <section className="portal-card learning-goal-card">
-          <span className="card-label-app">Dein nächster Schritt</span>
-          <h2>Nächstes Lernziel</h2>
-          <p>
-            <strong>
-              {learning?.next_learning_goal
-                || sortedEvaluations.find((item) => item.recommendation)?.recommendation
-                || "Wird nach der Auswertung festgelegt."}
-            </strong>
-          </p>
-          <Link href="/app/training?mode=focus">Dieses Ziel trainieren →</Link>
+        <section className="portal-card full coaching-conclusion-card">
+          <span className="card-label-app">Dein Coaching-Fazit</span>
+          <h2>Das nimmst du aus der Session mit</h2>
+          <div className="coaching-conclusion-grid">
+            <div className="coaching-conclusion-section conclusion-summary">
+              <span>1 · Kurzfazit</span>
+              <p>{session.summary || "Noch keine Zusammenfassung verfügbar."}</p>
+            </div>
+            <div className="coaching-conclusion-section conclusion-strengths">
+              <span>2 · Beobachtete Stärken</span>
+              {sessionStrengths.length ? (
+                <ul>
+                  {sessionStrengths.map((strength) => <li key={strength}>{strength}</li>)}
+                </ul>
+              ) : (
+                <p>Noch keine sitzungsbezogenen Stärken gespeichert.</p>
+              )}
+            </div>
+            <div className="coaching-conclusion-section conclusion-improvements">
+              <span>3 · Die wichtigsten Verbesserungshebel</span>
+              {improvements.length ? (
+                <ol>
+                  {improvements.map((item) => {
+                    const criterion = Array.isArray(item.criterion) ? item.criterion[0] : item.criterion;
+                    return (
+                      <li key={criterion?.id ?? item.recommendation}>
+                        <a href={`#evaluation-category-${criterion?.sort_order}`}>
+                          <strong>{criterion?.name || "Kriterium"}</strong>
+                          <span>{item.recommendation}</span>
+                        </a>
+                      </li>
+                    );
+                  })}
+                </ol>
+              ) : (
+                <p>Kein ausreichend belegter wichtiger Verbesserungshebel.</p>
+              )}
+            </div>
+            <div className="coaching-conclusion-section conclusion-goal">
+              <span>4 · Nächstes Lernziel</span>
+              <p><strong>{nextLearningGoal}</strong></p>
+              <Link href="/app/training?mode=focus">Dieses Ziel trainieren →</Link>
+            </div>
+          </div>
         </section>
 
         <section className="portal-card full evaluation-card">
           <span className="card-label-app">Sechs Kompetenzfelder</span>
           <h2>Bewertungen</h2>
           {sortedEvaluations.length ? (
-            <>
-              {(repeatedReasoning.size > 0 || repeatedEvidence.size > 0) && (
-                <div className="evaluation-shared">
-                  <strong>Coaching-Fazit</strong>
-                  {[...repeatedReasoning].map((text) => <p key={text}>{text}</p>)}
-                  {[...repeatedEvidence].map((text) => <small key={text}>Beleg: {text}</small>)}
-                </div>
-              )}
               <div className="score-grid">
                 {sortedEvaluations.map((item, index) => {
                   const criterion = Array.isArray(item.criterion)
@@ -208,12 +222,14 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
                   const name = criterion?.name || "Kriterium";
                   const reasoning = item.reasoning?.trim();
                   const evidence = item.evidence?.trim();
+                  const hasImprovement = hasCompleteImprovement(item);
                   const presentation = scorePresentation(item.score);
 
                   return (
                     <article
                       className={`score-card score-${presentation.tone}`}
                       key={criterion?.name ?? index}
+                      id={`evaluation-category-${criterion?.sort_order ?? index + 1}`}
                     >
                       <div className="session-score-overview">
                         <SessionScoreRing
@@ -233,20 +249,33 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
                         </div>
                       </div>
                       <p>
-                        {reasoning && !repeatedReasoning.has(reasoning)
+                        {reasoning
                           ? reasoning
                           : item.score === null
                             ? "Nicht ausreichend bewertbar."
                             : "Bewertung aus der Gesprächsanalyse."}
                       </p>
-                      {evidence && !repeatedEvidence.has(evidence) && (
+                      {evidence && (
                         <small><strong>Beleg</strong>{evidence}</small>
+                      )}
+                      {hasImprovement && (
+                        <div className="category-improvement">
+                          <div className="category-improvement-heading">
+                            <strong>Verbesserung</strong>
+                            <span>{item.improvement_priority ? `Hebel ${item.improvement_priority}` : "Kategorie-Hinweis"}</span>
+                          </div>
+                          <p>{item.recommendation}</p>
+                          <blockquote>
+                            <span>Alternative</span>
+                            {item.alternative_formulation}
+                          </blockquote>
+                          <small><strong>Beleg</strong>{item.improvement_evidence}</small>
+                        </div>
                       )}
                     </article>
                   );
                 })}
               </div>
-            </>
           ) : (
             <div className="empty-state">Noch keine Bewertungen verfügbar.</div>
           )}

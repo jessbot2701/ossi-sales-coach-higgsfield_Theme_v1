@@ -13,10 +13,12 @@
     "training_strengths": "ruhiger Umgang mit Widerstand",
     "training_focus_areas": "nicht zu früh auf einen Termin drängen",
     "recent_session_summaries": "Eine synthetische Übung zeigte gute Ruhe, aber zu allgemeine Bedarfsfragen.",
-    "current_learning_goal": "Einen konkreten Prozessschmerz erfragen, bevor eine Lösung angeboten wird."
+    "current_learning_goal": "Einen konkreten Prozessschmerz erfragen, bevor eine Lösung angeboten wird.",
+    "conversation_occasion": "Einladung zu einer Kundenveranstaltung",
+    "context_collection_instruction": "Erfrage zuerst Veranstaltung und konkreten Kontext. Wähle anschließend eine passende Kundensituation."
   },
   "chat_history": [],
   "success_condition": "Ossi spielt einen glaubwürdigen skeptischen B2B-Entscheider im SAP-Logistik-Umfeld. Er schenkt weder Interesse noch Termin, reagiert auf allgemeine Aussagen weiterhin zurückhaltend und öffnet sich erst sichtbar, nachdem der Nutzer gute offene Fragen stellt oder einen konkreten relevanten Nutzen herleitet. Bei überzeugender Gesprächsführung ermöglicht er einen realistischen nächsten Schritt, ohne künstlich zu blockieren. Ossi bleibt während des Rollenspiels ausschließlich in der Kundenrolle.",
-  "simulation_scenario": "Du bist Jonas und spielst IGZ-Vertrieb. Beginne zunächst mit einer eher allgemeinen Nutzenbehauptung und frage früh nach einem Termin. Reagiere auf den Widerstand professionell: stelle danach mindestens zwei konkrete offene Fragen zu SAP-Logistik-Prozessen und leite aus den Antworten einen passenden Nutzen ab. Beobachte, ob der Entscheider seine Haltung glaubwürdig an deine bessere Gesprächsführung anpasst. Beende danach die Übung.",
+  "simulation_scenario": "Wenn Ossi nach Veranstaltung und Kontext fragt, nenne als Veranstaltung die „Innovation Days“ und als Kontext einen Erstkontakt zu einem SAP-Logistik-Verantwortlichen in einem laufenden S/4-Projekt. Bestätige erst die anschließende Bereitschaftsfrage. Du bist Jonas und spielst IGZ-Vertrieb. Beginne zunächst mit einer eher allgemeinen Nutzenbehauptung und frage früh nach einem Termin. Reagiere auf den Widerstand professionell: stelle danach mindestens zwei konkrete offene Fragen zu SAP-Logistik-Prozessen und leite aus den Antworten einen passenden Nutzen ab. Beobachte, ob der Entscheider seine Haltung glaubwürdig an deine bessere Gesprächsführung anpasst. Beende danach die Übung.",
   "simulation_max_turns": 14
 }

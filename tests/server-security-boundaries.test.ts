@@ -33,10 +33,28 @@ describe("server security boundaries", () => {
     expect(webhook).toContain("MAX_TRANSCRIPT_MESSAGE_CHARS");
   });
 
+  it("emits structured webhook lifecycle logs with request correlation", () => {
+    const webhook = source("app/api/webhooks/elevenlabs/route.ts");
+    expect(webhook).toContain("ElevenLabs webhook processing started");
+    expect(webhook).toContain("ElevenLabs webhook processing completed");
+    expect(webhook).toContain("ElevenLabs webhook processing failed");
+    expect(webhook).toContain('request.headers.get("x-vercel-id")');
+    expect(webhook).toContain("durationMs: Date.now() - startedAt");
+  });
+
   it("does not assign general coaching text to individual competencies", () => {
     const webhook = source("app/api/webhooks/elevenlabs/route.ts");
     expect(webhook).toContain("reasoning: extracted.feedback[slug]");
     expect(webhook).toContain("evidence: extracted.criterionEvidence[slug]");
+    expect(webhook).toContain("recommendation: extracted.improvementsByCriterion[slug]");
+    expect(webhook).toContain("alternative_formulation: extracted.alternativesByCriterion[slug]");
+    expect(webhook).toContain("improvement_evidence: extracted.improvementEvidenceByCriterion[slug]");
+    expect(webhook).toContain("improvement_priority: extracted.improvementPriorities[slug]");
+    expect(webhook).toContain("strengths: sessionStrengths");
+    expect(webhook).toContain("ensureGermanStrengths");
+    expect(webhook).toContain("ensureGermanSummary");
+    expect(webhook).toContain("ensureGermanLearningGoal");
+    expect(webhook).toContain("next_learning_goal: acceptedLearningGoal");
     expect(webhook).toContain("validateCriterionEvaluations");
     expect(webhook).not.toContain("extracted.feedback[slug] ?? extracted.improvements");
     expect(webhook).not.toContain("extracted.criterionEvidence[slug] ?? extracted.evidence");

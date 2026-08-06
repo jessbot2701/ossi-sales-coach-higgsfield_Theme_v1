@@ -19,7 +19,9 @@ export async function POST(request: Request) {
     const supabase = createAdminClient();
     const { data, error } = await supabase.auth.admin.inviteUserByEmail(input.email, {
       data: { display_name: input.displayName },
-      redirectTo: `${getAppUrl(request)}/auth/callback?next=/set-password`,
+      // Admin invitations use an implicit session in the URL fragment. A server
+      // callback cannot read fragments, so the password page restores it client-side.
+      redirectTo: `${getAppUrl(request)}/set-password`,
     });
     if (error) throw mapInviteAuthError(error);
     if (!data.user) throw new ApiError(502, "Die Einladung konnte nicht versendet werden.", "invite_failed");

@@ -1,7 +1,15 @@
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
-import { apiErrorResponse, ApiError } from "@/lib/api";
-import { validateCriterionEvaluations } from "@/lib/coaching/evaluation-integrity";
+import { apiErrorResponse, ApiError, getErrorMessage } from "@/lib/api";
+import {
+  sanitizeSessionStrengths,
+  validateCriterionEvaluations,
+} from "@/lib/coaching/evaluation-integrity";
+import {
+  ensureGermanLearningGoal,
+  ensureGermanStrengths,
+  ensureGermanSummary,
+} from "@/lib/coaching/german-output";
 import { recomputeLearningProfiles } from "@/lib/coaching/recompute";
 import { analyzeTranscriptPhases } from "@/lib/coaching/transcript-phases";
 import { extractPostCallAnalysis } from "@/lib/elevenlabs/analysis";
@@ -38,6 +46,8 @@ function cleanTranscript(value: unknown) {
 }
 
 export async function POST(request: Request) {
+  const startedAt = Date.now();
+  const requestId = request.headers.get("x-vercel-id");
   let conversationId: string | undefined;
   let receiptClaimed = false;
   const supabase = createAdminClient();
@@ -59,6 +69,12 @@ export async function POST(request: Request) {
     const allowedAgents = new Set(requireServerEnv("ELEVENLABS_ALLOWED_AGENT_IDS").split(",").map((id) => id.trim()).filter(Boolean));
     if (!allowedAgents.has(data.agent_id)) throw new ApiError(403, "Der Agent ist für V2 nicht freigegeben.", "invalid_agent");
 
+    console.log(JSON.stringify({
+      level: "info",
+      message: "ElevenLabs webhook processing started",
+      requestId,
+      conversationId,
+    }));
     const payloadHash = createHash("sha256").update(rawBody).digest("hex");
     const { data: claim, error: claimError } = await supabase.rpc("claim_webhook_receipt", {
       receipt_conversation_id: conversationId, receipt_payload_hash: payloadHash,
@@ -98,13 +114,24 @@ export async function POST(request: Request) {
         score: extracted.scores[slug] ?? null,
         reasoning: extracted.feedback[slug],
         evidence: extracted.criterionEvidence[slug],
-        recommendation: extracted.nextLearningGoal,
+        recommendation: extracted.improvementsByCriterion[slug],
+        alternative_formulation: extracted.alternativesByCriterion[slug],
+        improvement_evidence: extracted.improvementEvidenceByCriterion[slug],
+        improvement_priority: extracted.improvementPriorities[slug],
       };
     }), transcript, phaseAnalysis);
+    const ratingContext = evaluations.map((evaluation, index) => ({
+      score: evaluation.score,
+      name: criteria[index]?.name,
+    }));
     const acceptedLearningGoal = phaseAnalysis.status === "recognized"
       && evaluations.some((evaluation) => evaluation.score !== null)
-      ? extracted.nextLearningGoal
+      ? ensureGermanLearningGoal(extracted.nextLearningGoal, ratingContext)
       : null;
+    const sessionStrengths = ensureGermanStrengths(
+      sanitizeSessionStrengths(extracted.strengths, phaseAnalysis),
+      ratingContext,
+    );
     const { error: evaluationsError } = await supabase.from("session_evaluations").upsert(evaluations, { onConflict: "session_id,criterion_id" });
     if (evaluationsError) throw evaluationsError;
 
@@ -112,7 +139,9 @@ export async function POST(request: Request) {
       status: "completed",
       duration_seconds: Number.isFinite(duration) && duration >= 0 ? Math.round(duration) : null,
       title: typeof snapshot.title === "string" ? snapshot.title : "Voice-Coaching",
-      summary: extracted.summary,
+      summary: ensureGermanSummary(extracted.summary, ratingContext),
+      strengths: sessionStrengths,
+      next_learning_goal: acceptedLearningGoal,
       transcript,
       completed_at: completedAt,
       expires_at: new Date(new Date(completedAt).setFullYear(new Date(completedAt).getFullYear() + 1)).toISOString(),
@@ -122,10 +151,26 @@ export async function POST(request: Request) {
 
     await recomputeLearningProfiles(supabase, session.user_id, version.training_type_id, session.id, acceptedLearningGoal);
     await supabase.rpc("finish_webhook_receipt", { receipt_conversation_id: conversationId, receipt_status: "processed", receipt_error: null });
+    console.log(JSON.stringify({
+      level: "info",
+      message: "ElevenLabs webhook processing completed",
+      requestId,
+      conversationId,
+      sessionId: session.id,
+      durationMs: Date.now() - startedAt,
+    }));
     return NextResponse.json({ received: true, sessionId: session.id });
   } catch (error) {
     if (conversationId && receiptClaimed) {
-      const message = error instanceof Error ? error.message.slice(0, 500) : "Unknown webhook error";
+      const message = getErrorMessage(error, "Unknown webhook error").slice(0, 500);
+      console.error(JSON.stringify({
+        level: "error",
+        message: "ElevenLabs webhook processing failed",
+        requestId,
+        conversationId,
+        error: message,
+        durationMs: Date.now() - startedAt,
+      }));
       await supabase.from("coaching_sessions").update({ status: "failed", processing_error: message }).eq("elevenlabs_conversation_id", conversationId);
       await supabase.rpc("finish_webhook_receipt", { receipt_conversation_id: conversationId, receipt_status: "failed", receipt_error: message });
     }

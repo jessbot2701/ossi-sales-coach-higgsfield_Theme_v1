@@ -19,6 +19,15 @@ function collectedValue(collection: UnknownRecord, key: string) {
   return record(entry).value ?? entry;
 }
 
+function structuredRecord(value: unknown) {
+  if (typeof value !== "string") return record(value);
+  try {
+    return record(JSON.parse(value.replace(/^```(?:json)?\s*|\s*```$/gi, "")));
+  } catch {
+    return {};
+  }
+}
+
 export function extractPostCallAnalysis(analysisValue: unknown) {
   const analysis = record(analysisValue);
   const collection = record(analysis.data_collection_results ?? analysis.data_collection);
@@ -38,18 +47,62 @@ export function extractPostCallAnalysis(analysisValue: unknown) {
     SCORE_KEYS.map((key) => [key, text(`${key}_${suffix}`)]),
   ) as Record<(typeof SCORE_KEYS)[number], string | null>;
 
+  const criterionImprovements = Object.fromEntries(SCORE_KEYS.map((key) => {
+    const raw = collectedValue(collection, `${key}_improvement`);
+    const improvement = structuredRecord(raw);
+    const improvementText = (field: "improvement" | "alternative" | "evidence") => {
+      const value = improvement[field];
+      return typeof value === "string" && value.trim()
+        ? value.trim().slice(0, MAX_ANALYSIS_TEXT_CHARS)
+        : null;
+    };
+    const numericPriority = Number(improvement.priority);
+    return [key, {
+      improvement: improvementText("improvement"),
+      alternative: improvementText("alternative"),
+      evidence: improvementText("evidence"),
+      priority: Number.isInteger(numericPriority) && numericPriority >= 1 && numericPriority <= 3
+        ? numericPriority
+        : null,
+    }];
+  })) as Record<(typeof SCORE_KEYS)[number], {
+    improvement: string | null;
+    alternative: string | null;
+    evidence: string | null;
+    priority: number | null;
+  }>;
+  const sessionConclusion = structuredRecord(collectedValue(collection, "session_conclusion"));
+  const conclusionText = (field: "summary" | "next_learning_goal") => {
+    const value = sessionConclusion[field];
+    return typeof value === "string" && value.trim()
+      ? value.trim().slice(0, MAX_ANALYSIS_TEXT_CHARS)
+      : null;
+  };
+  const conclusionStrengths = Array.isArray(sessionConclusion.strengths)
+    ? sessionConclusion.strengths
+      .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+      .slice(0, 3)
+      .join(", ")
+    : typeof sessionConclusion.strengths === "string"
+      ? sessionConclusion.strengths.trim().slice(0, MAX_ANALYSIS_TEXT_CHARS)
+      : null;
+
   return {
     scores,
     feedback: criterionText("feedback"),
     criterionEvidence: criterionText("evidence"),
-    summary: text("summary") ?? (
+    improvementsByCriterion: Object.fromEntries(SCORE_KEYS.map((key) => [key, criterionImprovements[key].improvement])),
+    alternativesByCriterion: Object.fromEntries(SCORE_KEYS.map((key) => [key, criterionImprovements[key].alternative])),
+    improvementEvidenceByCriterion: Object.fromEntries(SCORE_KEYS.map((key) => [key, criterionImprovements[key].evidence])),
+    improvementPriorities: Object.fromEntries(SCORE_KEYS.map((key) => [key, criterionImprovements[key].priority])),
+    summary: conclusionText("summary") ?? text("summary") ?? (
       typeof analysis.transcript_summary === "string"
         ? analysis.transcript_summary.trim().slice(0, MAX_ANALYSIS_TEXT_CHARS)
         : null
     ),
-    strengths: text("strengths"),
+    strengths: conclusionStrengths || text("strengths"),
     improvements: text("improvements"),
     evidence: text("evidence"),
-    nextLearningGoal: text("next_learning_goal"),
+    nextLearningGoal: conclusionText("next_learning_goal") ?? text("next_learning_goal"),
   };
 }

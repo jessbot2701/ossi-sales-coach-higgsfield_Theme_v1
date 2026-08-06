@@ -13,10 +13,12 @@
     "training_strengths": "professioneller Ton",
     "training_focus_areas": "Zentralengespräche",
     "recent_session_summaries": "Noch keine passende synthetische Session vorhanden.",
-    "current_learning_goal": "Das Anliegen in einem Satz relevant und weiterleitbar formulieren."
+    "current_learning_goal": "Das Anliegen in einem Satz relevant und weiterleitbar formulieren.",
+    "conversation_occasion": "Einladung zu einer Kundenveranstaltung",
+    "context_collection_instruction": "Erfrage zuerst Veranstaltung und konkreten Kontext. Wähle anschließend eine passende Kundensituation."
   },
   "chat_history": [],
   "success_condition": "Ossi verkörpert konsequent eine weibliche Zentrale unter erkennbarem Zeitdruck und wechselt nicht unaufgefordert zum Entscheider oder Coach. Eine Weiterleitung oder ein hilfreicher nächster Kontakt wird nur angeboten, wenn der Nutzer sein Anliegen knapp, relevant und glaubwürdig formuliert sowie professionell mit Rückfragen umgeht. Bei vagen Aussagen bleibt die Zentrale knapp und skeptisch. Die Öffnung muss zur Qualität der Gesprächsführung passen.",
-  "simulation_scenario": "Du bist Leonie im IGZ-Vertrieb. Nenne anfangs nur vage, dass es um Digitalisierung geht, und bitte um die SAP-Leitung. Wenn die Zentrale nachhakt oder abblockt, formuliere dein Anliegen in einem präzisen Satz mit Bezug zu einem synthetischen SAP-EWM-Prozessthema und begründe knapp, warum die zuständige Person relevant ist. Dränge nicht und erfinde keine bestehende Beziehung. Sage erst nach Weiterleitung, Kontaktweg oder klarer Ablehnung ausdrücklich: 'Rollenspiel beendet.' Vor diesen Worten darf Ossi die Zentralenrolle nicht verlassen.",
+  "simulation_scenario": "Wenn Ossi nach Veranstaltung und Kontext fragt, nenne als Veranstaltung die „Innovation Days“ und als Kontext einen Erstkontakt zu einem SAP-Logistik-Verantwortlichen in einem laufenden S/4-Projekt. Bestätige erst die anschließende Bereitschaftsfrage. Du bist Leonie im IGZ-Vertrieb. Nenne anfangs nur vage, dass es um Digitalisierung geht, und bitte um die SAP-Leitung. Wenn die Zentrale nachhakt oder abblockt, formuliere dein Anliegen in einem präzisen Satz mit Bezug zu einem synthetischen SAP-EWM-Prozessthema und begründe knapp, warum die zuständige Person relevant ist. Dränge nicht und erfinde keine bestehende Beziehung. Sage erst nach Weiterleitung, Kontaktweg oder klarer Ablehnung ausdrücklich: 'Rollenspiel beendet.' Vor diesen Worten darf Ossi die Zentralenrolle nicht verlassen.",
   "simulation_max_turns": 10
 }

@@ -7,6 +7,16 @@ export class ApiError extends Error {
   }
 }
 
+export function getErrorMessage(error: unknown, fallback = "Unknown error") {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  if (typeof error === "string" && error.trim()) return error;
+  if (error && typeof error === "object" && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) return message;
+  }
+  return fallback;
+}
+
 export function apiErrorResponse(error: unknown) {
   if (error instanceof ApiError) {
     return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });

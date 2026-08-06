@@ -3,6 +3,7 @@ import { OssiPortrait } from "@/components/ossi-portrait";
 import { requirePageUser } from "@/lib/auth";
 import { STRENGTH_MIN_AVERAGE_SCORE, STRENGTH_MIN_RATINGS } from "@/lib/coaching/progress";
 import { buildCoachingResume } from "@/lib/coaching/resume";
+import { formatAppDateTime } from "@/lib/date-time";
 import { createClient } from "@/lib/supabase/server";
 
 const statusLabel: Record<string, string> = { created: "Vorbereitet", active: "Aktiv", processing: "Auswertung", completed: "Abgeschlossen", failed: "Fehlgeschlagen" };
@@ -276,7 +277,7 @@ export default async function DashboardPage() {
                   <div className="timeline-marker"><span>{String(index + 1).padStart(2, "0")}</span></div>
                   <div className="timeline-content">
                     <time dateTime={session.created_at}>
-                      {new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short" }).format(new Date(session.created_at))}
+                      {formatAppDateTime(session.created_at)}
                     </time>
                     <Link href={`/app/sessions/${session.id}`}>{session.title || "Voice-Coaching"}</Link>
                     {session.summary && <p>{session.summary.slice(0, 180)}</p>}

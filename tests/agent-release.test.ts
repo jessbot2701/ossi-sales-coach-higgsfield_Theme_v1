@@ -12,6 +12,8 @@ const requiredVariables = [
   "user_first_name",
   "training_type",
   "scenario",
+  "conversation_occasion",
+  "context_collection_instruction",
   "session_mode",
   "session_focus",
   "available_training_focuses",
@@ -24,6 +26,30 @@ const requiredVariables = [
 ];
 
 describe("ElevenLabs V2 release simulation suite", () => {
+  it("verifies the remote prompt and the exact 25-field tier limit after every push", () => {
+    const releaseScript = readFileSync(
+      join(process.cwd(), "scripts/elevenlabs-agent-release.mjs"),
+      "utf8",
+    );
+    expect(releaseScript).toContain("async function verifyPushedAgent()");
+    expect(releaseScript).toContain("localKeys.length !== 25");
+    expect(releaseScript).toContain("remotePrompt !== localPrompt");
+    expect(releaseScript).toContain("await verifyPushedAgent()");
+  });
+
+  it("provides a focused five-run objection-handling stability gate at the release threshold", () => {
+    const releaseScript = readFileSync(
+      join(process.cwd(), "scripts/elevenlabs-agent-release.mjs"),
+      "utf8",
+    );
+    const packageJson = JSON.parse(readFileSync(join(process.cwd(), "package.json"), "utf8"));
+    expect(releaseScript).toContain("async function runObjectionGate()");
+    expect(releaseScript).toContain("TEST_CONFIGS[3]");
+    expect(releaseScript).toContain('action === "gate-objection"');
+    expect(releaseScript).toContain("evaluateInvocation(invocation, objectionTests, REPEAT_COUNT)");
+    expect(packageJson.scripts["test:agent:objection"]).toContain("gate-objection");
+  });
+
   it("versions exactly eight multi-turn simulation tests", () => {
     expect(registry.tests).toHaveLength(8);
     expect(new Set(registry.tests.map((test: { config: string }) => test.config)).size).toBe(8);

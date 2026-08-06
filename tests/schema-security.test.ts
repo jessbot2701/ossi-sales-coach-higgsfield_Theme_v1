@@ -4,6 +4,11 @@ import { describe, expect, it } from "vitest";
 
 const migration = readFileSync(join(process.cwd(), "supabase/migrations/20260719210605_init_coaching_platform.sql"), "utf8");
 const activeAccessMigration = readFileSync(join(process.cwd(), "supabase/migrations/20260720082724_enforce_active_user_access.sql"), "utf8");
+const improvementsMigration = readFileSync(join(process.cwd(), "supabase/migrations/20260727144417_add_category_improvements.sql"), "utf8");
+const sessionGoalMigration = readFileSync(join(process.cwd(), "supabase/migrations/20260727151317_add_session_learning_goal.sql"), "utf8");
+const expansionMigration = readFileSync(join(process.cwd(), "supabase/migrations/20260729141014_expand_session_improvements_and_training_occasions.sql"), "utf8");
+const customOccasionMigration = readFileSync(join(process.cwd(), "supabase/migrations/20260806132035_add_custom_conversation_occasion.sql"), "utf8");
+const storagePrecheckMigration = readFileSync(join(process.cwd(), "supabase/migrations/20260729151500_add_storage_ownership_precheck.sql"), "utf8");
 
 describe("database security contract", () => {
   it("enables RLS on every exposed application table", () => {
@@ -28,6 +33,41 @@ describe("database security contract", () => {
   it("uses a private, payload-free webhook receipt table", () => {
     expect(migration).toContain("create table private.webhook_receipts");
     expect(migration).not.toMatch(/create table private\.webhook_receipts[\s\S]*?payload jsonb[\s\S]*?;/i);
+  });
+
+  it("enforces complete, ranked category improvements and session strengths", () => {
+    for (const column of ["alternative_formulation", "improvement_evidence", "improvement_priority"]) {
+      expect(improvementsMigration).toContain(`add column ${column}`);
+    }
+    expect(improvementsMigration).toContain("session_evaluations_improvement_complete");
+    expect(improvementsMigration).toContain("session_evaluations_improvement_priority_idx");
+    expect(improvementsMigration).toContain("set recommendation = null");
+    expect(improvementsMigration).toContain("add column strengths jsonb");
+    expect(improvementsMigration).toContain("jsonb_array_length(strengths) <= 3");
+    expect(sessionGoalMigration).toContain("add column next_learning_goal text");
+    expect(expansionMigration).toContain("session_evaluations_low_score_improvement_required");
+    expect(expansionMigration).toContain("score not between 1 and 3");
+    expect(expansionMigration).toMatch(/improvement_priority is null[\s\S]*improvement_priority between 1 and 3/);
+  });
+
+  it("seeds only explicitly selectable conversation occasions", () => {
+    expect(expansionMigration).toContain("add column is_user_selectable boolean");
+    expect(expansionMigration).toContain("'customer_event_invitation'");
+    expect(expansionMigration).toContain("'Einladung zu einer Kundenveranstaltung'");
+    expect(expansionMigration).toContain("scenarios_user_selectable_idx");
+    expect(customOccasionMigration).toContain("'custom_conversation_occasion'");
+    expect(customOccasionMigration).toContain("'Eigener Gesprächsanlass'");
+    expect(customOccasionMigration).toContain("'Beschreibe Anlass und Kundenkontext in eigenen Worten.'");
+    expect(customOccasionMigration).toMatch(/true,\s*true,\s*2\s*\)/);
+    expect(customOccasionMigration).toContain("on conflict (training_type_id, slug) do update");
+  });
+
+  it("exposes the storage ownership precheck only to the service role", () => {
+    expect(storagePrecheckMigration).toContain("security definer");
+    expect(storagePrecheckMigration).toContain("set search_path = ''");
+    expect(storagePrecheckMigration).toContain("from storage.objects");
+    expect(storagePrecheckMigration).toContain("revoke all on function public.user_has_storage_objects(uuid) from public, anon, authenticated");
+    expect(storagePrecheckMigration).toContain("grant execute on function public.user_has_storage_objects(uuid) to service_role");
   });
 
   it("seeds an agent-selected surprise scenario", () => {
