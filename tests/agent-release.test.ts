@@ -50,6 +50,18 @@ describe("ElevenLabs V2 release simulation suite", () => {
     expect(packageJson.scripts["test:agent:objection"]).toContain("gate-objection");
   });
 
+  it("can resume a completed paid gate without starting duplicate test runs", () => {
+    const releaseScript = readFileSync(
+      join(process.cwd(), "scripts/elevenlabs-agent-release.mjs"),
+      "utf8",
+    );
+    expect(releaseScript).toContain("async function releaseAgentFromInvocation(invocationId)");
+    expect(releaseScript).toContain('action === "release-from-invocation"');
+    expect(releaseScript).toContain('saveInvocationReport(invocation, "gate-resumed")');
+    expect(releaseScript).toContain("evaluateInvocation(invocation, state.testDefinitions, REPEAT_COUNT)");
+    expect(releaseScript).toContain("Bestehendes Gate bestanden");
+  });
+
   it("versions exactly eight multi-turn simulation tests", () => {
     expect(registry.tests).toHaveLength(8);
     expect(new Set(registry.tests.map((test: { config: string }) => test.config)).size).toBe(8);

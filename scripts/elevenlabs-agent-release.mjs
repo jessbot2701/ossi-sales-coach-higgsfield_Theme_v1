@@ -467,6 +467,24 @@ async function releaseAgent() {
   await runSmoke();
 }
 
+async function releaseAgentFromInvocation(invocationId) {
+  if (typeof invocationId !== "string" || !/^suite_[A-Za-z0-9_-]+$/.test(invocationId)) {
+    fail("Für den Resume-Release fehlt eine gültige ElevenLabs-Invocation-ID.");
+  }
+  const state = await loadReleaseState();
+  const apiKey = requireApiKey();
+  console.log(`Prüfe bestehende Kandidaten-Invocation ${invocationId}.`);
+  const invocation = await waitForInvocation(apiKey, invocationId);
+  await saveInvocationReport(invocation, "gate-resumed");
+  if (!evaluateInvocation(invocation, state.testDefinitions, REPEAT_COUNT)) {
+    fail("V2-Agenten-Release durch die bestehende Kandidaten-Invocation blockiert.");
+  }
+  console.log("Bestehendes Gate bestanden; pushe ausschließlich den freigegebenen V2-Agenten und Branch.");
+  pushAgent();
+  await verifyPushedAgent();
+  await runSmoke();
+}
+
 async function main() {
   const action = process.argv[2] ?? "gate";
   if (action === "sync-tests") return syncTests();
@@ -476,7 +494,8 @@ async function main() {
   if (action === "gate-objection") return runObjectionGate();
   if (action === "smoke") return runSmoke();
   if (action === "release") return releaseAgent();
-  fail(`Unbekannte Aktion '${action}'. Erlaubt: sync-tests, gate, gate-debrief, gate-reception, gate-objection, smoke, release.`);
+  if (action === "release-from-invocation") return releaseAgentFromInvocation(process.argv[3]);
+  fail(`Unbekannte Aktion '${action}'. Erlaubt: sync-tests, gate, gate-debrief, gate-reception, gate-objection, smoke, release, release-from-invocation.`);
 }
 
 main().catch((error) => {
