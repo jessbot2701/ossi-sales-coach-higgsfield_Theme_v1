@@ -7,7 +7,7 @@ const activeAccessMigration = readFileSync(join(process.cwd(), "supabase/migrati
 const improvementsMigration = readFileSync(join(process.cwd(), "supabase/migrations/20260727144417_add_category_improvements.sql"), "utf8");
 const sessionGoalMigration = readFileSync(join(process.cwd(), "supabase/migrations/20260727151317_add_session_learning_goal.sql"), "utf8");
 const expansionMigration = readFileSync(join(process.cwd(), "supabase/migrations/20260729141014_expand_session_improvements_and_training_occasions.sql"), "utf8");
-const customOccasionMigration = readFileSync(join(process.cwd(), "supabase/migrations/20260806120000_add_custom_conversation_occasion.sql"), "utf8");
+const customOccasionMigration = readFileSync(join(process.cwd(), "supabase/migrations/20260806132035_add_custom_conversation_occasion.sql"), "utf8");
 const storagePrecheckMigration = readFileSync(join(process.cwd(), "supabase/migrations/20260729151500_add_storage_ownership_precheck.sql"), "utf8");
 
 describe("database security contract", () => {
