@@ -1,4 +1,6 @@
-# Vorbereitung der Demo-Übernahme am 20.10.2026
+# Demo-Übernahme am 20.10.2026
+
+**Ergebnis:** Die Korrekturen und das Sicherheitsupdate sind auf GitHub `main` und in der Demo veröffentlicht. Beide Datenbankmigrationen sind eingespielt. Die Projektpause ist aufgehoben, die Trainingsversion wieder aktiv und die temporäre Wartungsregel entfernt. Die technischen Prüfungen sind bestanden; der manuelle Sprach- und Auswertungstest mit einem echten angemeldeten Nutzer bleibt offen.
 
 ## Auftrag und Grenzen
 
@@ -32,6 +34,12 @@ Die lokalen Nachweise liegen im ignorierten Verzeichnis `artifacts/demo-rollout-
 | Playwright Desktop/Mobil | 6 Tests bestanden |
 | Git-Whitespace-Prüfung | Bestanden nach Entfernung einer Leerraumzeile in einem Test |
 | Abgleich versionierter Dateien mit vorhandenen lokalen Zugangsschlüsseln | 186 Dateien, 6 Zugangswerte, keine Treffer |
+| Vercel-Produktionsbuild | Erfolgreich, Deployment `dpl_B6kGY7in1FbYx6XUXVSX6YUfrvUH` |
+| Öffentliche Demo-Adresse und Login | Je HTTP 200 |
+| Nicht angemeldeter Zugriff auf `/app` | HTTP 307 zur Login-Seite |
+| Nicht angemeldeter Trainingsstart | HTTP 401 |
+| Webhook ohne Signatur | HTTP 401 |
+| Echter Auswertungsmonitor nach Freigabe | `healthy: true`, Exitcode 0 |
 
 Der Schlüsselabgleich gibt keine Werte aus und ist kein vollständiger historischer Secret-Scanner. Die Untersuchung von Tracking, Ignore-Regeln und lokaler Git-Historie ist im Korrekturprotokoll für Paket A/B dokumentiert.
 
@@ -57,22 +65,45 @@ Ein einzelner echter `get-signed-url`-Aufruf mit `include_conversation_id=true` 
 
 Die signierte URL und die Schlüssel wurden nicht ausgegeben oder in den Nachweis geschrieben. Es wurde keine WebSocket-Verbindung aufgebaut und kein Gespräch gestartet. Der Nachweis enthält nur Status, Feldnamen und Validierungsergebnis. Ein echter Audio-/Webhook-Durchlauf bleibt offen.
 
-## Veröffentlichungsblocker
+## Anfänglicher GitHub-Zugangsblocker – behoben
 
 Der lokale Push-Trockenlauf wurde von GitHub mit HTTP 403 abgewiesen: Der verwendete Git-Zugang gehört zu `cw-collab` und besitzt kein Schreibrecht auf dieses Repository. Für `jessbot2701` waren lokal keine verwendbaren Git-Zugangsdaten vorhanden.
 
 Die verbundene GitHub-App konnte das Repository unter dem Besitzerkonto lesen, lehnte das Anlegen eines Git-Baums aber ebenfalls mit HTTP 403 (`Resource not accessible by integration`) ab. Es wurde kein Remote-Branch aktualisiert.
 
-Der Nutzer wurde gebeten, den lokalen GitHub-Zugang für `jessbot2701` herzustellen. Bis dahin bleiben Vercel und Supabase unverändert: keine Wartungspause, keine Migration, kein Deployment.
+Nach dem Hinweis des Nutzers auf seine VS-Code-Anmeldung zeigte eine erneute Prüfung beide gültigen CLI-Konten. `gh auth switch --hostname github.com --user jessbot2701` aktivierte das richtige Konto. Der Push wurde mit dem GitHub-CLI-Credential-Helper ausgeführt, damit nicht der andere Zugang aus dem Git Credential Manager verwendet wird. Der Push-Trockenlauf und anschließend der echte Push von `main` bis `6580ba0` waren erfolgreich. Ein vorübergehend nicht erreichbarer Sandbox-Proxy erforderte für den Push eine genehmigte Ausführung außerhalb der Sandbox.
 
-## Fortsetzung nach Herstellung des Zugangs
+## Durchgeführte Umstellung und gelöster Vercel-Blocker
 
-1. Remote-Stand erneut abrufen; inzwischen hinzugekommene Änderungen erhalten und gegebenenfalls erneut prüfen.
-2. Schreibzugang mit Push-Trockenlauf bestätigen.
-3. Demo kurz pausieren, offene Sessions und letzte Startzeit erneut kontrollieren sowie ausstehende alte Verarbeitung ausschließen.
-4. Die geprüften Migrationen `20261020090942_protect_session_lifecycle.sql` und `20261020094802_reliable_evaluation_processing.sql` einspielen; Anwendung und Datenbank gemeinsam umstellen.
-5. Den geprüften Git-Stand veröffentlichen, Vercel-Build und zugeordneten Commit kontrollieren, Demo wieder öffnen.
-6. Erreichbarkeit, Auth-Schutz und Auswertungsmonitor prüfen.
-7. Manuell ein kurzes vollständiges Training durchführen, Auswertung prüfen, unmittelbar ein zweites Training starten und einen Abbruch testen. Stimmenwechsel und Aussprache mit echtem Audio prüfen. Nur eigens angelegte Testdaten löschen.
+- Vercel wurde pausiert; die öffentliche Adresse lieferte nachweislich `DEPLOYMENT_PAUSED`.
+- Die Migration für Paket C prüfte die Vorbedingungen erfolgreich und wurde angewendet. Anschließend wurde Paket D angewendet.
+- Die vom Migrationstool zunächst vergebenen Ausführungszeitstempel wurden in `supabase_migrations.schema_migrations` gezielt auf die beiden Versionen aus dem Repository abgeglichen.
+- Nach der Migration waren weiterhin 24 Sessions und 144 Bewertungen vorhanden, ohne offene Sessions oder laufende Receipt-Verarbeitung.
+- Der echte Auswertungsmonitor meldete `healthy: true`, keine überfälligen oder wiederholt fehlgeschlagenen Versuche und einen bereits vorher vorhandenen fehlgeschlagenen Receipt. Dieser historische Receipt wurde nicht verändert.
+- Der GitHub-Deploy, ein expliziter API-Deploy und der CLI-Deploy aus einem isolierten Git-Archiv wurden während der Projektpause jeweils unmittelbar als `BLOCKED` angelegt. Diese Versuche wurden nicht als erfolgreiche Builds gezählt.
+- Die aktive Trainingsversion `11000000-0000-0000-0000-000000000001` wurde vorsorglich vorübergehend deaktiviert und nach erfolgreichem Deployment wieder aktiviert.
+- Die automatische Freigabeprüfung lehnte ein Aufheben der Projektpause ab, solange dadurch alter Code gegen die neue Datenbank erreichbar wäre.
+- Eine vollständige Firewall-Wartungssperre wurde ebenfalls durch die automatische Freigabeprüfung abgelehnt. Die Connector-API meldete auch für engere Regeln `Seawall Config not found`. Das war keine belastbare Aussage über die aktuelle CLI-Unterstützung: Der Ablauf über die aktuelle CLI mit Entwurf und Veröffentlichung funktionierte anschließend.
+- Der Nutzer erteilte ausdrücklich die zusätzliche Zustimmung: „Ja, temporäre Wartungsregel und Umstellung durchführen“.
+- Mit der offiziellen Vercel-CLI 64.7.0 wurde ausschließlich die temporäre Regel `Temporary demo write maintenance 2026-10-20` hinzugefügt und veröffentlicht. Sie sperrte Pfade unter `/api/` sowie die Methoden POST, PUT, PATCH und DELETE.
+- Nach Aufhebung der Projektpause wurden Trainingsstart, Webhook und POST auf `/login` tatsächlich mit HTTP 403 abgewiesen. Dadurch blieben die Schreibwege des alten Codes gesperrt.
+- Der Produktionsbuild aus Commit `6580ba079b6ea30c1ef7484347c160516d16e13f` wurde danach erfolgreich gebaut. Deployment `dpl_B6kGY7in1FbYx6XUXVSX6YUfrvUH` erreichte `READY`; die kanonische Demo-Adresse wurde nachweislich diesem Deployment zugeordnet.
+- Erst danach wurde die ursprüngliche Trainingsversion wieder aktiviert und ausschließlich die hinzugefügte Wartungsregel entfernt. Ihre Entfernung wurde veröffentlicht; anschließend bestanden alle fünf HTTP-Smokes und der Auswertungsmonitor.
+
+Demo: <https://ossi-sales-coach-higgsfield-theme-v.vercel.app>
+
+Der Datensicherungsstand wurde nicht zurückgespielt, da die Migrationen und Bestandsprüfungen erfolgreich waren. Alte blockierte Deployment-Versuche sind weiterhin als solche in Vercel sichtbar. Ein routinemäßiger Dokumentations-Push kann anschließend ein weiteres Deployment mit unverändertem Anwendungscode auslösen.
+
+Der Prompt, die Agentenkonfiguration und bestehende Gesprächsinhalte blieben unverändert. Kein echtes Sprachgespräch wurde gestartet.
+
+## Verbleibender manueller Test und Grenzen
+
+1. Anmelden und ein kurzes vollständiges Training bis zum Gesprächsabschluss durchführen.
+2. Die anschließende Auswertung auf sechs Kriterien, nachvollziehbare Belege und erhaltene Stärken prüfen.
+3. Unmittelbar ein zweites Training starten und anschließend einen Abbruch testen.
+4. Stimmenwechsel und Aussprache mit echtem Audio prüfen.
+5. Nur eigens angelegte Testdaten löschen und die daraus aktualisierte Übersicht kontrollieren.
+
+Es wurde kein echtes Sprachgespräch gestartet. Der Live-Nachweis umfasst den URL-Vertrag, Erreichbarkeit, Auth-/Signaturschutz und den Datenbankmonitor, nicht den vollständigen Audio-/Webhook-Zyklus. Für den Monitor wurde kein externer Zeitplan oder Alarmempfänger eingerichtet. Ein historisch fehlgeschlagener Receipt ist unverändert vorhanden; es gibt keine überfälligen oder wiederholt fehlgeschlagenen Verarbeitungsvorgänge.
 
 Der ElevenLabs-Prompt und die Agentenkonfiguration bleiben bei sämtlichen Schritten unverändert.
