@@ -62,14 +62,7 @@ export function ensureGermanStrengths(
 
 export function ensureGermanLearningGoal(
   providerGoal: string | null | undefined,
-  criteria: RatedCriterion[],
 ) {
   const goal = providerGoal?.trim();
-  if (goal && !isProbablyEnglish(goal)) return goal;
-  const weakest = rated(criteria)
-    .filter((item) => item.name?.trim())
-    .sort((a, b) => a.score - b.score)[0];
-  return weakest
-    ? `${weakest.name} in einer konkreten Gesprächssituation gezielt trainieren.`
-    : null;
+  return goal && !isProbablyEnglish(goal) ? goal : null;
 }

@@ -1,7 +1,66 @@
 import { describe, expect, it } from "vitest";
 import { extractPostCallAnalysis } from "@/lib/elevenlabs/analysis";
+import { sanitizeSessionStrengths } from "@/lib/coaching/evaluation-integrity";
+import { analyzeTranscriptPhases } from "@/lib/coaching/transcript-phases";
+import { twoRoleplays } from "./fixtures/roleplay";
 
 describe("post-call analysis extraction", () => {
+  it.each([
+    { value: ["Ruhig, auch bei Einwänden", "", null, 42, "Fragen; präzise", "Nutzen\nklar"], expected: ["Ruhig, auch bei Einwänden", "Fragen; präzise", "Nutzen\nklar"] },
+    { value: [], expected: [] },
+    { value: [" ", null, false], expected: [] },
+    { value: "- Ruhiger Einstieg\n2. Offene Fragen;Klarer Nutzen", expected: ["Ruhiger Einstieg", "Offene Fragen", "Klarer Nutzen"] },
+    { value: "Ruhiger Einstieg, offene Fragen, klarer Nutzen", expected: ["Ruhiger Einstieg", "offene Fragen", "klarer Nutzen"] },
+    { value: null, expected: [] },
+  ])("keeps array boundaries and explicitly parses supported legacy strengths: $value", ({ value, expected }) => {
+    for (const collection of [
+      { session_conclusion: { value: JSON.stringify({ strengths: value }) } },
+      { strengths: { value } },
+    ]) {
+      const result = extractPostCallAnalysis({ data_collection_results: collection });
+      expect(sanitizeSessionStrengths(result.strengths, analyzeTranscriptPhases(twoRoleplays))).toEqual(expected);
+      expect(sanitizeSessionStrengths(result.strengths, analyzeTranscriptPhases([]))).toEqual([]);
+    }
+  });
+
+  it("does not replace an explicit empty strengths array with legacy content", () => {
+    expect(extractPostCallAnalysis({ data_collection_results: {
+      session_conclusion: { value: { strengths: [] } }, strengths: { value: "Alte Stärke" },
+    } }).strengths).toEqual([]);
+  });
+  it("extracts a standalone goal and supports direct collection values and fenced improvement JSON", () => {
+    const result = extractPostCallAnalysis({ data_collection: {
+      next_learning_goal: "Zwei offene Fragen vor dem Lösungsvorschlag stellen.",
+      conversation_opening_feedback: "Den Anlass präzise und kundenzentriert benennen.",
+      conversation_opening_evidence: "Guten Tag, ich rufe wegen Ihrer Lagerprozesse an.",
+      conversation_opening_improvement: '```json\n{"improvement":"Den Bedarf konkret erfragen.","alternative":"Was möchten Sie verbessern?","evidence":"Ihre Lagerprozesse","priority":2}\n```',
+    } });
+    expect(result.nextLearningGoal).toBe("Zwei offene Fragen vor dem Lösungsvorschlag stellen.");
+    expect(result.feedback.conversation_opening).toBe("Den Anlass präzise und kundenzentriert benennen.");
+    expect(result.improvementPriorities.conversation_opening).toBe(2);
+  });
+
+  it.each([undefined, {}, { data_collection_results: {
+    conversation_opening_feedback: { value: { text: "invalid" } },
+    conversation_opening_evidence: { value: ["invalid"] },
+    conversation_opening_improvement: { value: "not JSON" },
+    session_conclusion: { value: { next_learning_goal: { text: "invalid" } } },
+    next_learning_goal: { value: 42 },
+  } }])("does not fabricate missing or invalid provider fields: %j", (analysis) => {
+    const result = extractPostCallAnalysis(analysis);
+    expect(result.feedback.conversation_opening).toBeNull();
+    expect(result.criterionEvidence.conversation_opening).toBeNull();
+    expect(result.improvementsByCriterion.conversation_opening).toBeNull();
+    expect(result.nextLearningGoal).toBeNull();
+  });
+
+  it("prefers a valid session conclusion goal over the standalone goal", () => {
+    expect(extractPostCallAnalysis({ data_collection_results: {
+      session_conclusion: { value: { next_learning_goal: "Das vereinbarte Lernziel aus dem Abschluss." } },
+      next_learning_goal: { value: "Anderes Lernziel." },
+    } }).nextLearningGoal).toBe("Das vereinbarte Lernziel aus dem Abschluss.");
+  });
+
   it("extracts all configured integer scores and coaching text", () => {
     const result = extractPostCallAnalysis({
       transcript_summary: "Fallback",
@@ -40,7 +99,7 @@ describe("post-call analysis extraction", () => {
     expect(result.improvementEvidenceByCriterion.conversation_opening).toBe("Ich würde gerne unser Portfolio vorstellen.");
     expect(result.improvementPriorities.conversation_opening).toBe(1);
     expect(result.feedback.needs_discovery).toBeNull();
-    expect(result.strengths).toBe("Ruhige Sprache, Klare Frage");
+    expect(result.strengths).toEqual(["Ruhige Sprache", "Klare Frage"]);
     expect(result.nextLearningGoal).toBe("Einwände spiegeln");
   });
 

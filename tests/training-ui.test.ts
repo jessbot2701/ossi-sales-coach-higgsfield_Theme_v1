@@ -61,8 +61,7 @@ describe("training launcher UI", () => {
     expect(launcher).toContain('aria-label="Voice-Training starten"');
     expect(launcher).toContain('aria-label="Gespräch beenden"');
     expect(launcher).toContain('fetch("/api/sessions/start"');
-    expect(launcher).toContain("startSession({");
-    expect(launcher).toContain("onConnect: async ({ conversationId })");
+    expect(launcher).toContain("startManagedVoiceSession({");
     expect(launcher).toContain("onClick={() => endSession()}");
     expect(styles).toContain(".voice-phone {");
     expect(styles).toContain(".voice-call-button");

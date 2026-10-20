@@ -26,11 +26,18 @@ describe("German coaching output", () => {
       .toBe("Du hast den Anlass klar und ruhig vermittelt.");
   });
 
-  it("derives German strengths and a German goal when provider text is English", () => {
+  it("derives German strengths but does not invent a missing German learning goal", () => {
     expect(ensureGermanStrengths(["Strong opening"], criteria)).toEqual([
       "Gesprächseröffnung: überzeugend umgesetzt",
     ]);
-    expect(ensureGermanLearningGoal("Improve discovery questions", criteria))
-      .toBe("Fragetechnik und Bedarfsermittlung in einer konkreten Gesprächssituation gezielt trainieren.");
+    expect(ensureGermanLearningGoal("Improve discovery questions")).toBeNull();
+    expect(ensureGermanLearningGoal(null)).toBeNull();
+    expect(ensureGermanLearningGoal(undefined)).toBeNull();
+    expect(ensureGermanLearningGoal("   ")).toBeNull();
+  });
+
+  it("preserves the supplied German learning goal without deriving another goal from scores", () => {
+    expect(ensureGermanLearningGoal("  In der nächsten Übung stelle ich zwei offene Fragen.  "))
+      .toBe("In der nächsten Übung stelle ich zwei offene Fragen.");
   });
 });

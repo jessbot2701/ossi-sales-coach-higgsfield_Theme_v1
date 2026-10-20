@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { validateCriterionEvaluations } from "../lib/coaching/evaluation-integrity.ts";
-import { analyzeTranscriptPhases, type TranscriptTurn } from "../lib/coaching/transcript-phases.ts";
+import { analyzeTranscriptPhases, hasEvaluableRoleplay, type TranscriptTurn } from "../lib/coaching/transcript-phases.ts";
 
 type EvaluationRow = {
   criterion_id: string;
@@ -149,7 +149,7 @@ async function rebuildUserLearningState(userId: string) {
   if (sessionError) throw sessionError;
 
   const safeSessions = ((sessionData ?? []) as Omit<SessionRow, "user_id" | "session_evaluations">[])
-    .filter((session) => analyzeTranscriptPhases(Array.isArray(session.transcript) ? session.transcript : []).status === "recognized");
+    .filter((session) => hasEvaluableRoleplay(analyzeTranscriptPhases(Array.isArray(session.transcript) ? session.transcript : [])));
   const sessionIds = safeSessions.map((session) => session.id);
 
   const [{ data: criteriaData, error: criteriaError }, { data: competenciesData, error: competenciesError }, { data: versionsData, error: versionsError }] = await Promise.all([
@@ -255,7 +255,7 @@ for (const session of sessions) {
   usersToRebuild.add(session.user_id);
   const transcript = Array.isArray(session.transcript) ? session.transcript : [];
   const phaseAnalysis = analyzeTranscriptPhases(transcript);
-  if (phaseAnalysis.status !== "recognized") {
+  if (!hasEvaluableRoleplay(phaseAnalysis)) {
     skippedSessions += 1;
     console.log(`[ÜBERSPRUNGEN:${phaseAnalysis.status}] Session ${session.id}: ${phaseAnalysis.reason}`);
     continue;

@@ -48,7 +48,7 @@ Die acht versionierten ElevenLabs-Multi-Turn-Simulationen werden bewusst nicht b
 npm run release:agent
 ```
 
-Dieser Befehl validiert zuerst Agent- und Branch-ID, führt jeden Test fünfmal aus, pusht nur nach bestandenem Gate den V2-Agenten und startet danach zwei Smokes gegen die gespeicherte Remote-Konfiguration. Der Schlüssel wird ausschließlich aus `ELEVENLABS_API_KEY` gelesen; vollständige Simulationstranskripte werden nicht ausgegeben. Details und den verpflichtenden manuellen Audio-Smoke beschreibt [docs/production-setup.md](docs/production-setup.md).
+Dieser Befehl validiert zuerst Agent- und Branch-ID und speichert einen Release-Snapshot mit SHA-256-Hash. Er führt jeden Test fünfmal gegen diesen Stand aus, pusht nach bestandenem Gate ausschließlich dessen isolierte Kopie, verifiziert die Remote-Konfiguration und startet danach zwei Smokes. Ein Resume verwendet denselben gespeicherten Snapshot. Der Schlüssel wird ausschließlich aus `ELEVENLABS_API_KEY` gelesen; vollständige Simulationstranskripte werden nicht ausgegeben. Nachweise, Resume-Grenzen und den verpflichtenden manuellen Audio-Smoke beschreibt [docs/production-setup.md](docs/production-setup.md).
 
 Die vollständige Produktionsinbetriebnahme einschließlich SMTP, Auth-Templates, erstem Admin, Cron, Webhook und Vercel-Secrets ist in [docs/production-setup.md](docs/production-setup.md) beschrieben.
 

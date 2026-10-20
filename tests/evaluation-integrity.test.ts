@@ -3,6 +3,8 @@ import {
   sanitizeSessionStrengths,
   validateCriterionEvaluations,
 } from "@/lib/coaching/evaluation-integrity";
+import { ROLEPLAY_START_MARKER } from "@/lib/coaching/transcript-phases";
+import { coachingReply, coachSuggestion, firstEvidence, secondEvidence, twoRoleplays } from "./fixtures/roleplay";
 
 const evaluation = (overrides: Partial<{
   score: number | null;
@@ -29,6 +31,43 @@ const transcript = [
 ];
 
 describe("criterion evaluation integrity", () => {
+  it.each([firstEvidence, secondEvidence])("accepts provider evidence from either exercise: %s", (evidence) => {
+    const result = validateCriterionEvaluations([evaluation({ evidence })], twoRoleplays)[0];
+    expect(result).toMatchObject({ score: 4, evidence });
+  });
+
+  it.each([coachingReply, coachSuggestion])("excludes coaching and agent suggestions between exercises: %s", (evidence) => {
+    expect(validateCriterionEvaluations([evaluation({ evidence })], twoRoleplays)[0])
+      .toMatchObject({ score: null, reasoning: null, evidence: null });
+  });
+
+  it("only accepts evidence from completed exercises in a partial transcript", () => {
+    const partial = [
+      ...twoRoleplays.slice(0, 4),
+      { role: "agent", message: ROLEPLAY_START_MARKER },
+      { role: "user", message: secondEvidence },
+    ];
+    const results = validateCriterionEvaluations([
+      evaluation({ evidence: firstEvidence }),
+      evaluation({ evidence: secondEvidence, reasoning: "Die Frage ist klar auf die konkreten Engpässe ausgerichtet." }),
+    ], partial);
+    expect(results.map((item) => item.score)).toEqual([4, null]);
+  });
+
+  it("keeps complete improvements from either exercise without accepting coaching evidence", () => {
+    for (const evidence of [firstEvidence, secondEvidence, coachingReply, coachSuggestion]) {
+      const result = validateCriterionEvaluations([evaluation({
+        score: 3,
+        evidence: firstEvidence,
+        recommendation: "Mit offenen Fragen den konkreten Bedarf herausarbeiten.",
+        alternative_formulation: "Welche Abläufe möchten Sie als Erstes verbessern?",
+        improvement_evidence: evidence,
+        improvement_priority: 1,
+      })], twoRoleplays)[0];
+      expect(result.score).toBe([firstEvidence, secondEvidence].includes(evidence) ? 3 : null);
+    }
+  });
+
   it("keeps a specific evaluation whose evidence occurs in a user turn", () => {
     expect(validateCriterionEvaluations([evaluation()], transcript)[0].score).toBe(4);
   });
@@ -77,6 +116,20 @@ describe("criterion evaluation integrity", () => {
     ], transcript)[0];
 
     expect(result.score).toBe(4);
+  });
+
+  it.each([
+    "GUTEN TAG – mein Name ist Weiß",
+    "Ich rufe wegen Ihrer Lagerprozesse an.",
+    "Ｇｕｔｅｎ Tag, mein Name ist Weiß.",
+  ])("keeps a fully evidenced quote under Unicode, case and punctuation normalization: %s", (evidence) => {
+    expect(validateCriterionEvaluations([evaluation({ evidence })], transcript)[0])
+      .toMatchObject({ score: 4, evidence });
+  });
+
+  it("does not match a quote ending inside another word", () => {
+    expect(validateCriterionEvaluations([evaluation({ evidence: "Ich rufe wegen Ihrer Lager" })], transcript)[0])
+      .toMatchObject({ score: null, evidence: null });
   });
 
   it("marks every criterion unrated when no safe roleplay boundaries exist", () => {

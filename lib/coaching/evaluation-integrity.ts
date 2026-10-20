@@ -1,5 +1,6 @@
 import {
   analyzeTranscriptPhases,
+  hasEvaluableRoleplay,
   type TranscriptPhaseAnalysis,
   type TranscriptTurn,
 } from "./transcript-phases.ts";
@@ -41,6 +42,16 @@ function comparableMatch(candidate: string, source: string) {
   return normalizedSource.includes(normalizedCandidate) || normalizedCandidate.includes(normalizedSource);
 }
 
+// Evidence must be a complete, contiguous sequence of words in one user turn.
+// Normalize Unicode, case, punctuation and whitespace, but never discard text
+// inside brackets or markup: those could hide an invented assertion.
+function evidenceMatch(candidate: string, source: string) {
+  const words = (value: string) => value.normalize("NFKC").toLocaleLowerCase("de")
+    .replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  const quote = words(candidate);
+  return quote.length >= 12 && ` ${words(source)} `.includes(` ${quote} `);
+}
+
 function withoutImprovement<T extends CompleteImprovement>(evaluation: T) {
   return {
     ...evaluation,
@@ -72,11 +83,14 @@ export function selectSessionImprovements<T extends CompleteImprovement>(evaluat
     .slice(0, MAX_PRIORITY_IMPROVEMENTS);
 }
 
-export function sanitizeSessionStrengths(value: string | null, phaseAnalysis: TranscriptPhaseAnalysis) {
-  if (phaseAnalysis.status !== "recognized" || !value) return [];
-  return value
-    .split(/\r?\n|;|,\s+/)
-    .map((item) => item.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "").trim())
+export function sanitizeSessionStrengths(value: string[] | string | null, phaseAnalysis: TranscriptPhaseAnalysis) {
+  if (!hasEvaluableRoleplay(phaseAnalysis) || !value) return [];
+  // Arrays already define item boundaries. Only legacy strings use separators.
+  const items = Array.isArray(value)
+    ? value
+    : value.split(/\r?\n|;|,\s+/).map((item) => item.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, ""));
+  return items
+    .map((item) => item.trim())
     .filter(Boolean)
     .slice(0, MAX_PRIORITY_IMPROVEMENTS);
 }
@@ -97,7 +111,7 @@ export function validateCriterionEvaluations<T extends CriterionEvaluation>(
   }
 
   const validated = evaluations.map((evaluation) => {
-    if (phaseAnalysis.status !== "recognized") {
+    if (!hasEvaluableRoleplay(phaseAnalysis)) {
       return withoutImprovement({
         ...evaluation,
         score: null,
@@ -115,7 +129,7 @@ export function validateCriterionEvaluations<T extends CriterionEvaluation>(
       && reasoningFrequency.get(reasoningKey) === 1
       && !agentMessages.some((message) => comparableMatch(evaluation.reasoning as string, message));
     const hasUserEvidence = !!evaluation.evidence
-      && userMessages.some((message) => comparableMatch(evaluation.evidence as string, message));
+      && userMessages.some((message) => evidenceMatch(evaluation.evidence as string, message));
 
     const rating = validScore && hasSpecificReasoning && hasUserEvidence
       ? evaluation
@@ -127,7 +141,7 @@ export function validateCriterionEvaluations<T extends CriterionEvaluation>(
     };
 
     const hasRoleplayImprovementEvidence = hasCompleteImprovement(evaluation)
-      && userMessages.some((message) => comparableMatch(evaluation.improvement_evidence as string, message));
+      && userMessages.some((message) => evidenceMatch(evaluation.improvement_evidence as string, message));
 
     const lowScore = rating.score !== null && rating.score >= 1 && rating.score <= 3;
     if (!lowScore) return withoutImprovement(rating);

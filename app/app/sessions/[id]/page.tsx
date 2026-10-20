@@ -295,7 +295,9 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
               <div className="transcript">
                 {transcriptPhases.status !== "recognized" && (
                   <p className="transcript-phase-warning">
-                    Die Rollenspielgrenzen dieses älteren Transkripts sind nicht eindeutig erkennbar.
+                    {transcriptPhases.status === "partial"
+                      ? "Nur vollständig abgeschlossene, eindeutige Rollenspielabschnitte werden ausgewertet. Weitere Abschnitte sind unvollständig oder widersprüchlich markiert."
+                      : "Die Rollenspielgrenzen dieses Transkripts sind nicht eindeutig erkennbar."}
                   </p>
                 )}
                 {transcriptPhases.segments.map((segment, index, segments) => {

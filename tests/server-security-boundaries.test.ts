@@ -29,8 +29,9 @@ describe("server security boundaries", () => {
     const webhook = source("app/api/webhooks/elevenlabs/route.ts");
     expect(webhook).toContain("MAX_WEBHOOK_BODY_BYTES");
     expect(webhook).toContain("readTextBodyWithLimit");
-    expect(webhook).toContain("MAX_TRANSCRIPT_TURNS");
-    expect(webhook).toContain("MAX_TRANSCRIPT_MESSAGE_CHARS");
+    const preparation = source("lib/coaching/prepare-evaluation.ts");
+    expect(preparation).toContain("MAX_TRANSCRIPT_TURNS");
+    expect(preparation).toContain("MAX_TRANSCRIPT_MESSAGE_CHARS");
   });
 
   it("emits structured webhook lifecycle logs with request correlation", () => {
@@ -43,7 +44,7 @@ describe("server security boundaries", () => {
   });
 
   it("does not assign general coaching text to individual competencies", () => {
-    const webhook = source("app/api/webhooks/elevenlabs/route.ts");
+    const webhook = source("lib/coaching/prepare-evaluation.ts");
     expect(webhook).toContain("reasoning: extracted.feedback[slug]");
     expect(webhook).toContain("evidence: extracted.criterionEvidence[slug]");
     expect(webhook).toContain("recommendation: extracted.improvementsByCriterion[slug]");
@@ -81,12 +82,10 @@ describe("server security boundaries", () => {
     expect(session).toContain("Administrativer Nur-Lese-Zugriff");
   });
 
-  it("recomputes derived learning data after a session is deleted", () => {
+  it("delegates deletion and derived learning data to the transactional database API", () => {
     const route = source("app/api/sessions/[id]/route.ts");
-    expect(route).toContain("recomputeLearningProfiles");
-    expect(route.indexOf('.delete().eq("id", id)')).toBeLessThan(
-      route.indexOf("await recomputeLearningProfiles"),
-    );
+    expect(route).toContain('"delete_session_consistently"');
+    expect(route).not.toContain(".delete()");
   });
 
   it("defers active-user checks on protected pages to the cached page authorization", () => {
@@ -104,11 +103,10 @@ describe("server security boundaries", () => {
   it("recomputes progress without loading transcripts or issuing per-competency upserts", () => {
     const recompute = source("lib/coaching/recompute.ts");
 
-    expect(recompute).toContain("session:coaching_sessions!inner");
+    expect(recompute).toContain('rpc("rebuild_learning_profiles"');
     expect(recompute).not.toContain("transcript");
     expect(recompute).not.toContain("analyzeTranscriptPhases");
-    expect(recompute).toContain(".upsert(progressRows");
-    expect(recompute).toContain(".upsert(profileRows");
+    expect(recompute).not.toContain(".upsert(");
   });
 
   it("scopes dashboard evidence through an inner session join and explains scores on demand", () => {

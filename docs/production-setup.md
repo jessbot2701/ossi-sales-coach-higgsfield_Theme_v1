@@ -23,6 +23,26 @@ Die Migration aktiviert `pg_cron` und plant täglich `private.purge_expired_tran
 
 ## 2. ElevenLabs-Agent
 
+### Voraussetzung für die Verarbeitung ab Paket D
+
+Die Migration `20261020094802_reliable_evaluation_processing.sql` benötigt Paket C. Anwendung, Webhook, Löschroute und Recovery-Werkzeug gemeinsam umstellen und laufende alte Worker vorher beenden bzw. ablaufen lassen. Die alten Receipt-RPCs ohne Versuchstoken werden entfernt. Alte unvollständige Receipts erhalten beim nächsten passenden Eingang einen neuen Claim; abgeschlossene Receipts bleiben abgeschlossen. Ein gemischter Betrieb alter und neuer Writer ist nicht unterstützt.
+
+Receipt-Leases laufen zwei Minuten. Eine noch aktive Lease liefert HTTP 503 und darf nicht als erledigtes Duplikat quittiert werden. Erneute Zustellung übernimmt abgelaufene Versuche automatisch. Ohne weitere Providerzustellung sind Monitoring und die explizite Recovery anhand einer gespeicherten Vorschau erforderlich. Auswertung, alle Lernprofilbereiche, Fortschritt und Receipt-Abschluss werden atomar geschrieben; auch die Sessionlöschung berechnet Aggregate in derselben Transaktion neu.
+
+Nach einer späteren, separat freigegebenen Inbetriebnahme den read-only Check `npm run maintenance:evaluations:health` mindestens minütlich ausführen und Exitcode 1 oder 2 an das vorhandene Monitoring melden. Standardwerte: `EVALUATION_FAILURE_ATTEMPTS=3`, `EVALUATION_MAX_OVERDUE=0`, `EVALUATION_MAX_REPEATED_FAILURES=0`. Exitcode 0 bedeutet innerhalb der Schwellen, 2 überschrittene Schwellen, 1 fehlende bzw. fehlerhafte Prüfung. Dieser lokale Durchlauf richtet keinen externen Scheduler oder Alarmempfänger ein.
+
+Bestehende Aggregate können gezielt mit `select public.rebuild_learning_profiles('<user-uuid>');` repariert werden, auch wenn die ursprüngliche Session gelöscht wurde. Die Funktion verwendet ausschließlich vorhandene abgeschlossene Bewertungen; fehlende Providerbewertungen werden dadurch nicht rekonstruiert. Vor einem Bestandslauf betroffene Nutzer auswählen und vorhandene Ergebnisse sichern. Alte Cleanup-/Einmalskripte sind nicht Teil des neuen transaktionalen Schreibpfads und dürfen nicht parallel als Online-Writer betrieben werden.
+
+Vorschau-/Recovery-Anleitung, Datenschutzgrenzen der lokalen Plan-Dateien und lokale Testnachweise: [Korrekturprotokoll Paket D](Korrekturprotokoll_2026-10-20_Paket_D.md).
+
+### Voraussetzung für den Session-Lebenszyklus ab Paket C
+
+Die Migration `20261020090942_protect_session_lifecycle.sql` und der zugehörige Anwendungscode müssen bei einer später separat freigegebenen Inbetriebnahme gemeinsam eingeführt werden. Währenddessen neue Starts sperren, bestehende Gespräche kontrolliert beenden und mindestens 16 Minuten seit dem letzten alten Start abwarten. Es dürfen keine Sessions mit Status `created` oder `active` mehr vorhanden sein. Die Migration verweigert andernfalls die Ausführung. Ein bloßes Umsetzen des Datenbankstatus beendet keine Provider-Verbindung. Alte Conversations erhalten durch die Migration keine nachträglich als vertrauenswürdig deklarierte Zuordnung; ihre späten Webhooks werden ignoriert. Ausstehende alte Auswertungen daher vor der Umstellung abschließen.
+
+Der Start fordert `include_conversation_id=true` an und speichert die vom Provider reservierte Conversation-ID vor Ausgabe der einmal verwendbaren signierten URL. Fehlende oder widersprüchliche IDs werden abgewiesen. Vor einer Produktivfreigabe ist dieser Vertrag mit dem eingesetzten Providerkonto kontrolliert zu prüfen. In diesem lokalen Durchlauf wurde kein Provider aufgerufen.
+
+Ein Abbruch beendet zunächst das Browser-SDK. Die Datenbank gibt den Platz erst nach bestätigtem Providerende frei; Providerfehler halten die Sperre aufrecht. Ein ungenutzter, nicht gebundener Zugang kann nach 16 Minuten bei Provider-404 freigegeben werden. Bei gebundenen Gesprächen reicht Zeitablauf nicht. Ein erneuter Start prüft einen offenen Providerstatus erneut. Details, lokale Testanleitung und Grenzen: [Korrekturprotokoll Paket C](Korrekturprotokoll_2026-10-20_Paket_C.md).
+
 Ziel laut Repository:
 
 - Agent: `agent_1901kxtjy2q5e77bp29wnkc2jnqv`
@@ -41,10 +61,33 @@ Der Release-Runner führt in dieser Reihenfolge aus:
 
 1. `agents.json` enthält exakt die freigegebene Agent-ID und Branch-ID.
 2. Alle acht Tests sind registriert und in `platform_settings.testing.attached_tests` angehängt.
-3. Die lokale Kandidatenkonfiguration läuft per `agent_config_override`; jeder Test wird fünfmal ausgeführt.
+3. Agent, Testdefinitionen, Zuordnungen und Gate-Regeln werden als SHA-256-adressierter Snapshot gespeichert. Die Remote-Testdefinitionen müssen vor dem Start damit übereinstimmen. Die Kandidatenkonfiguration dieses Snapshots läuft per `agent_config_override`; jeder Test wird fünfmal ausgeführt.
 4. Standardtests benötigen mindestens 4/5, Geheimhaltung sowie Manipulations- und Rollenfestigkeit 5/5.
-5. Erst danach pusht die CLI ausschließlich Agent `agent_1901kxtjy2q5e77bp29wnkc2jnqv` auf Branch `agtbrch_4401kxtjy2qme72rdn3qkn5a61dg`.
-6. Überraschungsmodus und gezielte Einwandbehandlung laufen anschließend ohne Override als Post-Push-Smokes gegen die gespeicherte Remote-Version.
+5. Der Runner prüft Invocation, Branch, Wiederholungszahl, eindeutige Runs sowie die tatsächlich je Run verwendete Definition (`test_info`). Fehlende oder abweichende Nachweise blockieren. Erst danach pusht die CLI ausschließlich Agent `agent_1901kxtjy2q5e77bp29wnkc2jnqv` auf Branch `agtbrch_4401kxtjy2qme72rdn3qkn5a61dg`, aus einer isolierten Kopie des Snapshots.
+6. Alle im Snapshot konfigurierten Felder werden remote verglichen. Überraschungsmodus und gezielte Einwandbehandlung laufen anschließend mit den Testzuordnungen des Snapshots ohne Override als Post-Push-Smokes. Danach wird die Remote-Konfiguration erneut geprüft.
+
+### Snapshot, Wiederaufnahme und Nachweis
+
+Die Belege liegen lokal im bereits ignorierten Verzeichnis `artifacts/test-results/release-snapshots/`:
+
+- `<sha256>.json`: Agentenkonfiguration, Registry-Eintrag, acht Testdefinitionen mit IDs und Gate-Policy. Die Datei wird exklusiv angelegt; ihr Inhalt wird beim Resume erneut gehasht.
+- `<invocation>.json`: exklusiv gespeicherte Zuordnung des vollständigen Gates zum Snapshot, unmittelbar nach dem Start und vor dem Polling.
+- `<invocation>-result.json`: Snapshot-Hash, Invocation, tatsächliche Runs und Gate-Ergebnis.
+- `<invocation>-published.json`: Snapshot-Hash, Gate-Invocation, Veröffentlichungsstatus, Remote-Konfigurationshash und Smoke-Invocation. Ein Fehler nach Pushbeginn bleibt als fehlgeschlagener beziehungsweise bei Prozessabbruch unvollständiger Versuch sichtbar.
+
+Ein unterbrochenes vollständiges Gate kann so wiederaufgenommen werden:
+
+```bash
+node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/elevenlabs-agent-release.mjs release-from-invocation <suite_id>
+```
+
+Resume verwendet ausschließlich den zugeordneten Snapshot, auch wenn Arbeitsdateien inzwischen geändert wurden. Es fragt das Gate-Ergebnis erneut ab und startet kein neues vollständiges Gate. Fehlende oder beschädigte Belege, eine andere Gate-Policy sowie fremde Invocations werden abgewiesen. Ältere Invocations ohne Snapshot, fokussierte Gates und Smokes berechtigen nicht zur Veröffentlichung. Geht die Startantwort verloren oder bricht der Prozess vor dem Speichern der Zuordnung ab, ist kein automatischer Resume möglich; es wird niemals nachträglich eine beliebige Invocation einem aktuellen Kandidaten zugeordnet.
+
+Beim Konfigurationsvergleich ist nur die Reihenfolge von JSON-Objektschlüsseln unerheblich. Entsprechend der installierten ElevenLabs-CLI wird das veraltete `conversation_config.agent.prompt.tools` auf beiden Seiten entfernt, wenn `tool_ids` vorhanden ist; auch das Gate-Override verwendet diese Darstellung. Array-Reihenfolge, Nullwerte und alle übrigen konfigurierten Inhalte müssen exakt stimmen. Zusätzliche Top-Level-Metadaten der GET-Antwort werden nicht als Konfiguration behandelt. Unbekannte Provider-Normalisierungen oder fehlendes `test_info` führen zum Abbruch und benötigen eine gezielte Vertragsprüfung, keine pauschale Lockerung.
+
+Grundlagen: [Run tests](https://elevenlabs.io/docs/eleven-agents/api-reference/tests/run-tests), [Get test](https://elevenlabs.io/docs/eleven-agents/api-reference/tests/get), [Get test invocation](https://elevenlabs.io/docs/eleven-agents/api-reference/tests/test-invocations/get). Die lokale Regression führt den echten Runner in temporären Verzeichnissen mit synthetischer Umgebung, vollständig ersetztem `fetch` und abgefangenem CLI-Prozess aus. Sie ruft keine Provider auf.
+
+Die Snapshot-Dateien sind ein lokaler Integritätsnachweis, keine Signatur gegen einen Angreifer mit Schreibzugriff auf alle Belege. Den gesamten Belegordner aufbewahren. Unabhängige Remote-Releases müssen betrieblich serialisiert werden; der Runner kann spätere externe Änderungen am Branch nicht sperren. Ein fehlgeschlagener Post-Push-Check rollt den bereits erfolgten Push nicht automatisch zurück.
 
 Der Runner protokolliert nur Testname, Passrate und eine kurze ElevenLabs-Fehlergruppe, niemals API-Key oder vollständige Transkripte.
 

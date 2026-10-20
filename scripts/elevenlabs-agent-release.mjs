@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -37,6 +38,7 @@ const ELEVENLABS_DIR = join(ROOT_DIR, "elevenlabs");
 const AGENTS_PATH = join(ELEVENLABS_DIR, "agents.json");
 const TESTS_PATH = join(ELEVENLABS_DIR, "tests.json");
 const TEST_RESULTS_DIR = join(ROOT_DIR, "artifacts", "test-results");
+const SNAPSHOTS_DIR = join(TEST_RESULTS_DIR, "release-snapshots");
 
 function fail(message) {
   throw new Error(message);
@@ -177,6 +179,9 @@ async function loadReleaseState({ requireIds = true } = {}) {
       fail("platform_settings.testing.attached_tests muss exakt die acht registrierten V2-Test-IDs enthalten.");
     }
   }
+  if (new Set(testDefinitions.map(({ entry }) => entry.id)).size !== testDefinitions.length && requireIds) {
+    fail("Die acht Tests müssen unterschiedliche Test-IDs haben.");
+  }
 
   return { agent, agentConfig, agentConfigPath, testsRegistry, testDefinitions };
 }
@@ -191,6 +196,13 @@ function testPayload(definition) {
     simulation_scenario: definition.simulation_scenario,
     simulation_max_turns: definition.simulation_max_turns,
   };
+}
+
+function testExecutionDefinition(definition) {
+  const payload = testPayload(definition);
+  // test_info contains execution parameters, not the display name.
+  delete payload.name;
+  return payload;
 }
 
 async function syncTests() {
@@ -226,11 +238,103 @@ async function syncTests() {
 }
 
 function candidateOverride(agentConfig) {
+  agentConfig = normalizedAgentConfig(agentConfig);
   return {
     conversation_config: agentConfig.conversation_config,
     platform_settings: agentConfig.platform_settings,
     workflow: agentConfig.workflow,
   };
+}
+
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).filter((key) => value[key] !== undefined).sort()
+      .map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function contentHash(value) {
+  return createHash("sha256").update(canonicalJson(value)).digest("hex");
+}
+
+function freeze(value) {
+  if (value && typeof value === "object") {
+    Object.values(value).forEach(freeze);
+    Object.freeze(value);
+  }
+  return value;
+}
+
+function gatePolicy() {
+  return { repeatCount: REPEAT_COUNT, testConfigs: TEST_CONFIGS, criticalConfigs: [...CRITICAL_CONFIGS] };
+}
+
+// Match the installed CLI's documented tools/tool_ids compatibility rule.
+// No other values, array order, nulls or provider defaults are normalized.
+function normalizedAgentConfig(config) {
+  const copy = structuredClone(config);
+  const prompt = copy.conversation_config?.agent?.prompt;
+  if (prompt?.tool_ids !== undefined) delete prompt.tools;
+  return copy;
+}
+
+async function saveSnapshot(state) {
+  const snapshot = freeze({
+    schemaVersion: 1,
+    agent: state.agent,
+    agentConfig: state.agentConfig,
+    testDefinitions: state.testDefinitions,
+    gatePolicy: gatePolicy(),
+  });
+  const snapshotHash = contentHash(snapshot);
+  await mkdir(SNAPSHOTS_DIR, { recursive: true });
+  const path = join(SNAPSHOTS_DIR, `${snapshotHash}.json`);
+  try {
+    await writeFile(path, `${JSON.stringify(snapshot, null, 2)}\n`, { encoding: "utf8", flag: "wx" });
+  } catch (error) {
+    if (error.code !== "EEXIST" || contentHash(await readJson(path)) !== snapshotHash) throw error;
+  }
+  console.log(`Release-Snapshot: ${snapshotHash}`);
+  return { snapshot, snapshotHash };
+}
+
+async function loadSnapshot(invocationId) {
+  const receipt = await readJson(join(SNAPSHOTS_DIR, `${invocationId}.json`));
+  if (receipt.invocationId !== invocationId || receipt.kind !== "full-gate"
+    || !/^[a-f0-9]{64}$/.test(receipt.snapshotHash ?? "")) {
+    fail("Fehlender oder unpassender vollständiger Gate-Nachweis.");
+  }
+  const snapshot = await readJson(join(SNAPSHOTS_DIR, `${receipt.snapshotHash}.json`));
+  if (contentHash(snapshot) !== receipt.snapshotHash || snapshot.schemaVersion !== 1
+    || canonicalJson(snapshot.gatePolicy) !== canonicalJson(gatePolicy())
+    || snapshot.agent?.id !== EXPECTED_AGENT_ID || snapshot.agent?.branch_id !== EXPECTED_BRANCH_ID
+    || normalizeConfigPath(snapshot.agent?.config ?? "") !== EXPECTED_CONFIG
+    || canonicalJson(snapshot.testDefinitions?.map((test) => test.configPath)) !== canonicalJson(TEST_CONFIGS)) {
+    fail("Release-Snapshot ist beschädigt oder passt nicht zur aktuellen Gate-Policy.");
+  }
+  return { snapshot: freeze(snapshot), snapshotHash: receipt.snapshotHash, invocationId };
+}
+
+async function verifyTestDefinitions(apiKey, tests) {
+  for (const test of tests) {
+    const remote = await apiRequest(apiKey, `/v1/convai/agent-testing/${encodeURIComponent(test.entry.id)}`, { method: "GET" });
+    if (canonicalJson(testPayload(remote)) !== canonicalJson(testPayload(test.definition))) {
+      fail(`Remote-Testdefinition weicht vom Snapshot ab: ${test.configPath}. Tests zuerst synchronisieren.`);
+    }
+  }
+}
+
+async function completeGate(apiKey, release, label) {
+  const { snapshot, snapshotHash, invocationId } = release;
+  const invocation = await waitForInvocation(apiKey, invocationId);
+  await verifyTestDefinitions(apiKey, snapshot.testDefinitions);
+  const passed = evaluateInvocation(invocation, snapshot.testDefinitions, REPEAT_COUNT);
+  await saveInvocationReport(invocation, label);
+  await writeJson(join(SNAPSHOTS_DIR, `${invocationId}-result.json`), { snapshotHash, invocationId, passed, invocation });
+  if (!passed) fail("V2-Agenten-Release durch unzureichende Simulationsstabilität blockiert.");
+  return release;
 }
 
 async function startInvocation(apiKey, tests, { override, repeatCount }) {
@@ -263,6 +367,10 @@ async function waitForInvocation(apiKey, invocationId) {
       { method: "GET" },
     );
     const runs = Array.isArray(invocation?.test_runs) ? invocation.test_runs : [];
+    if (invocation?.id !== invocationId
+      || (invocation.agent_id !== undefined && invocation.agent_id !== EXPECTED_AGENT_ID)) {
+      fail("Test-Invocation gehört nicht zum angeforderten Lauf oder Agenten.");
+    }
     if (runs.length > 0 && runs.every((run) => run.status === "passed" || run.status === "failed")) {
       if (invocation.branch_id !== EXPECTED_BRANCH_ID) {
         fail(`Test-Invocation lief auf unerwartetem Branch: ${invocation.branch_id ?? "fehlt"}`);
@@ -291,9 +399,28 @@ function failureGroup(invocation, testId) {
 }
 
 function evaluateInvocation(invocation, tests, repeatCount, { smoke = false } = {}) {
+  const expectedIds = new Set(tests.map((test) => test.entry.id));
+  if (invocation.repeat_count !== repeatCount
+    || invocation.test_runs.length !== tests.length * repeatCount
+    || new Set(invocation.test_runs.map((run) => run.test_run_id)).size !== invocation.test_runs.length
+    || invocation.test_runs.some((run) => (
+      !expectedIds.has(run.test_id) || typeof run.test_run_id !== "string"
+      || run.test_invocation_id !== invocation.id || run.agent_id !== EXPECTED_AGENT_ID
+      || run.branch_id !== EXPECTED_BRANCH_ID
+    ))) {
+    return false;
+  }
   let suitePassed = true;
   for (const test of tests) {
     const runs = invocation.test_runs.filter((run) => run.test_id === test.entry.id);
+    // The provider returns the definition used by each run in test_info.
+    // Checking only the current remote definition would miss change-and-revert races.
+    if (runs.some((run) => !run.test_info
+      || canonicalJson(testExecutionDefinition(run.test_info)) !== canonicalJson(testExecutionDefinition(test.definition)))) {
+      console.log(`${test.definition.name}: fehlende oder abweichende Testdefinition im Lauf.`);
+      suitePassed = false;
+      continue;
+    }
     const passed = runs.filter((run) => run.status === "passed").length;
     const required = smoke || CRITICAL_CONFIGS.has(test.configPath) ? repeatCount : Math.ceil(repeatCount * 0.8);
     const ok = runs.length === repeatCount && passed >= required;
@@ -307,18 +434,22 @@ function evaluateInvocation(invocation, tests, repeatCount, { smoke = false } = 
 async function runGate() {
   const state = await loadReleaseState();
   const apiKey = requireApiKey();
-  console.log(`Starte Kandidaten-Gate: ${state.testDefinitions.length} Tests × ${REPEAT_COUNT} Läufe.`);
-  const invocationId = await startInvocation(apiKey, state.testDefinitions, {
-    override: candidateOverride(state.agentConfig),
+  const release = await saveSnapshot(state);
+  await verifyTestDefinitions(apiKey, release.snapshot.testDefinitions);
+  console.log(`Starte Kandidaten-Gate: ${release.snapshot.testDefinitions.length} Tests × ${REPEAT_COUNT} Läufe.`);
+  const invocationId = await startInvocation(apiKey, release.snapshot.testDefinitions, {
+    override: candidateOverride(release.snapshot.agentConfig),
     repeatCount: REPEAT_COUNT,
   });
+  if (!/^suite_[A-Za-z0-9_-]+$/.test(invocationId)) fail("Ungültige Test-Invocation-ID.");
+  // Persist the binding before polling so interrupted gates can be resumed.
+  await writeFile(join(SNAPSHOTS_DIR, `${invocationId}.json`), JSON.stringify({
+    kind: "full-gate", invocationId, snapshotHash: release.snapshotHash,
+  }), { encoding: "utf8", flag: "wx" });
   console.log(`ElevenLabs-Invocation: ${invocationId}`);
-  const invocation = await waitForInvocation(apiKey, invocationId);
-  await saveInvocationReport(invocation, "gate");
-  if (!evaluateInvocation(invocation, state.testDefinitions, REPEAT_COUNT)) {
-    fail("V2-Agenten-Release durch unzureichende Simulationsstabilität blockiert.");
-  }
+  const completed = await completeGate(apiKey, { ...release, invocationId }, "gate");
   console.log("Kandidaten-Gate bestanden.");
+  return completed;
 }
 
 async function runDebriefGate() {
@@ -381,8 +512,8 @@ async function runObjectionGate() {
   console.log("Einwandbehandlungs-Gate bestanden.");
 }
 
-async function runSmoke() {
-  const state = await loadReleaseState();
+async function runSmoke(state = null) {
+  state ??= await loadReleaseState();
   const apiKey = requireApiKey();
   const smokeTests = state.testDefinitions.filter(({ configPath }) => SMOKE_CONFIGS.has(configPath));
   console.log("Starte Post-Push-Smoke gegen die gespeicherte Remote-Konfiguration.");
@@ -394,9 +525,16 @@ async function runSmoke() {
     fail("Post-Push-Smoke fehlgeschlagen.");
   }
   console.log("Post-Push-Smoke vollständig bestanden.");
+  return invocationId;
 }
 
-function pushAgent() {
+async function pushAgent(snapshot) {
+  // The CLI may update its registry. Give it a separate copy, never the source
+  // worktree or the content-addressed evidence files.
+  const stagingDir = await mkdtemp(join(TEST_RESULTS_DIR, "release-stage-"));
+  await mkdir(join(stagingDir, "agent_configs"));
+  await writeJson(join(stagingDir, "agents.json"), { agents: [snapshot.agent] });
+  await writeJson(join(stagingDir, EXPECTED_CONFIG), snapshot.agentConfig);
   const cliArguments = [
     "agents",
     "push",
@@ -411,7 +549,7 @@ function pushAgent() {
     ? ["/d", "/s", "/c", "elevenlabs", ...cliArguments]
     : cliArguments;
   const result = spawnSync(command, commandArguments, {
-    cwd: ELEVENLABS_DIR,
+    cwd: stagingDir,
     env: process.env,
     stdio: "inherit",
     shell: false,
@@ -420,8 +558,7 @@ function pushAgent() {
   if (result.status !== 0) fail(`ElevenLabs-CLI-Push schlug mit Exit-Code ${result.status} fehl.`);
 }
 
-async function verifyPushedAgent() {
-  const state = await loadReleaseState();
+async function verifyPushedAgent(state) {
   const apiKey = requireApiKey();
   const remote = await apiRequest(
     apiKey,
@@ -456,33 +593,60 @@ async function verifyPushedAgent() {
   if (remotePrompt !== localPrompt) {
     fail("Der ElevenLabs-Push wurde nicht vollständig übernommen: Der Remote-Prompt entspricht nicht dem Release-Kandidaten.");
   }
-  console.log("Remote-Konfiguration verifiziert: Prompt und exakt 25 Data-Collection-Felder stimmen überein.");
+  const expected = normalizedAgentConfig(state.agentConfig);
+  const actual = normalizedAgentConfig(remote);
+  for (const key of Object.keys(expected)) {
+    if (canonicalJson(actual[key]) !== canonicalJson(expected[key])) {
+      fail(`Remote-Konfiguration weicht vom Release-Snapshot ab: ${key}.`);
+    }
+  }
+  console.log("Remote-Konfiguration vollständig gegen den Release-Snapshot verifiziert.");
+  return { agentId: EXPECTED_AGENT_ID, branchId: EXPECTED_BRANCH_ID, configHash: contentHash(expected) };
+}
+
+async function publishRelease(release) {
+  const { snapshot, snapshotHash, invocationId } = release;
+  const publicationPath = join(SNAPSHOTS_DIR, `${invocationId}-published.json`);
+  const publication = {
+    snapshotHash, invocationId, status: "push-started", remoteVerified: false, smokeInvocationId: null,
+  };
+  await writeJson(publicationPath, publication);
+  try {
+    await pushAgent(snapshot);
+    publication.remote = await verifyPushedAgent(snapshot);
+    publication.remoteVerified = true;
+    publication.status = "remote-verified";
+    await writeJson(publicationPath, publication);
+    publication.smokeInvocationId = await runSmoke(snapshot);
+    // Check again in case the remote branch changed while smokes were running.
+    publication.remoteVerified = false;
+    await verifyPushedAgent(snapshot);
+    publication.remoteVerified = true;
+    publication.status = "completed";
+    await writeJson(publicationPath, publication);
+  } catch (error) {
+    publication.status = "failed";
+    await writeJson(publicationPath, publication);
+    throw error;
+  }
 }
 
 async function releaseAgent() {
-  await runGate();
-  console.log("Gate bestanden; pushe ausschließlich den freigegebenen V2-Agenten und Branch.");
-  pushAgent();
-  await verifyPushedAgent();
-  await runSmoke();
+  const release = await runGate();
+  console.log("Gate bestanden; pushe ausschließlich den freigegebenen V2-Snapshot.");
+  await publishRelease(release);
 }
 
 async function releaseAgentFromInvocation(invocationId) {
   if (typeof invocationId !== "string" || !/^suite_[A-Za-z0-9_-]+$/.test(invocationId)) {
     fail("Für den Resume-Release fehlt eine gültige ElevenLabs-Invocation-ID.");
   }
-  const state = await loadReleaseState();
+  const release = await loadSnapshot(invocationId);
   const apiKey = requireApiKey();
   console.log(`Prüfe bestehende Kandidaten-Invocation ${invocationId}.`);
-  const invocation = await waitForInvocation(apiKey, invocationId);
-  await saveInvocationReport(invocation, "gate-resumed");
-  if (!evaluateInvocation(invocation, state.testDefinitions, REPEAT_COUNT)) {
-    fail("V2-Agenten-Release durch die bestehende Kandidaten-Invocation blockiert.");
-  }
+  await completeGate(apiKey, release, "gate-resumed");
   console.log("Bestehendes Gate bestanden; pushe ausschließlich den freigegebenen V2-Agenten und Branch.");
-  pushAgent();
-  await verifyPushedAgent();
-  await runSmoke();
+  await publishRelease(release);
 }
 
 async function main() {

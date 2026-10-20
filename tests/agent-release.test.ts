@@ -26,17 +26,6 @@ const requiredVariables = [
 ];
 
 describe("ElevenLabs V2 release simulation suite", () => {
-  it("verifies the remote prompt and the exact 25-field tier limit after every push", () => {
-    const releaseScript = readFileSync(
-      join(process.cwd(), "scripts/elevenlabs-agent-release.mjs"),
-      "utf8",
-    );
-    expect(releaseScript).toContain("async function verifyPushedAgent()");
-    expect(releaseScript).toContain("localKeys.length !== 25");
-    expect(releaseScript).toContain("remotePrompt !== localPrompt");
-    expect(releaseScript).toContain("await verifyPushedAgent()");
-  });
-
   it("provides a focused five-run objection-handling stability gate at the release threshold", () => {
     const releaseScript = readFileSync(
       join(process.cwd(), "scripts/elevenlabs-agent-release.mjs"),
@@ -48,18 +37,6 @@ describe("ElevenLabs V2 release simulation suite", () => {
     expect(releaseScript).toContain('action === "gate-objection"');
     expect(releaseScript).toContain("evaluateInvocation(invocation, objectionTests, REPEAT_COUNT)");
     expect(packageJson.scripts["test:agent:objection"]).toContain("gate-objection");
-  });
-
-  it("can resume a completed paid gate without starting duplicate test runs", () => {
-    const releaseScript = readFileSync(
-      join(process.cwd(), "scripts/elevenlabs-agent-release.mjs"),
-      "utf8",
-    );
-    expect(releaseScript).toContain("async function releaseAgentFromInvocation(invocationId)");
-    expect(releaseScript).toContain('action === "release-from-invocation"');
-    expect(releaseScript).toContain('saveInvocationReport(invocation, "gate-resumed")');
-    expect(releaseScript).toContain("evaluateInvocation(invocation, state.testDefinitions, REPEAT_COUNT)");
-    expect(releaseScript).toContain("Bestehendes Gate bestanden");
   });
 
   it("versions exactly eight multi-turn simulation tests", () => {

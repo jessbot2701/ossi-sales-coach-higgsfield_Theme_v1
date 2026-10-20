@@ -36,15 +36,16 @@ export function extractPostCallAnalysis(analysisValue: unknown) {
     return [key, Number.isInteger(numeric) && numeric >= 1 && numeric <= 5 ? numeric : null];
   })) as Record<(typeof SCORE_KEYS)[number], number | null>;
 
-  const text = (key: string) => {
+  const text = (key: string, allowTruncation = true) => {
     const value = collectedValue(collection, key);
+    if (!allowTruncation && typeof value === "string" && value.trim().length > MAX_ANALYSIS_TEXT_CHARS) return null;
     return typeof value === "string" && value.trim()
       ? value.trim().slice(0, MAX_ANALYSIS_TEXT_CHARS)
       : null;
   };
 
   const criterionText = (suffix: "feedback" | "evidence") => Object.fromEntries(
-    SCORE_KEYS.map((key) => [key, text(`${key}_${suffix}`)]),
+    SCORE_KEYS.map((key) => [key, text(`${key}_${suffix}`, suffix !== "evidence")]),
   ) as Record<(typeof SCORE_KEYS)[number], string | null>;
 
   const criterionImprovements = Object.fromEntries(SCORE_KEYS.map((key) => {
@@ -52,6 +53,7 @@ export function extractPostCallAnalysis(analysisValue: unknown) {
     const improvement = structuredRecord(raw);
     const improvementText = (field: "improvement" | "alternative" | "evidence") => {
       const value = improvement[field];
+      if (field === "evidence" && typeof value === "string" && value.trim().length > MAX_ANALYSIS_TEXT_CHARS) return null;
       return typeof value === "string" && value.trim()
         ? value.trim().slice(0, MAX_ANALYSIS_TEXT_CHARS)
         : null;
@@ -78,13 +80,13 @@ export function extractPostCallAnalysis(analysisValue: unknown) {
       ? value.trim().slice(0, MAX_ANALYSIS_TEXT_CHARS)
       : null;
   };
-  const conclusionStrengths = Array.isArray(sessionConclusion.strengths)
-    ? sessionConclusion.strengths
-      .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+  const strengths = (value: unknown) => Array.isArray(value)
+    ? value
+      .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
       .slice(0, 3)
-      .join(", ")
-    : typeof sessionConclusion.strengths === "string"
-      ? sessionConclusion.strengths.trim().slice(0, MAX_ANALYSIS_TEXT_CHARS)
+      .map((item) => item.trim().slice(0, MAX_ANALYSIS_TEXT_CHARS))
+    : typeof value === "string" && value.trim()
+      ? value.trim().slice(0, MAX_ANALYSIS_TEXT_CHARS)
       : null;
 
   return {
@@ -100,7 +102,7 @@ export function extractPostCallAnalysis(analysisValue: unknown) {
         ? analysis.transcript_summary.trim().slice(0, MAX_ANALYSIS_TEXT_CHARS)
         : null
     ),
-    strengths: conclusionStrengths || text("strengths"),
+    strengths: strengths(sessionConclusion.strengths) ?? strengths(collectedValue(collection, "strengths")),
     improvements: text("improvements"),
     evidence: text("evidence"),
     nextLearningGoal: conclusionText("next_learning_goal") ?? text("next_learning_goal"),

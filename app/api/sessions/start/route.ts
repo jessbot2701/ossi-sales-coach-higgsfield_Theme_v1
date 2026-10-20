@@ -3,7 +3,7 @@ import { z } from "zod";
 import { apiErrorResponse, ApiError } from "@/lib/api";
 import { requireApiUser } from "@/lib/auth";
 import { resolveConversationOccasion } from "@/lib/conversation-occasion";
-import { requireServerEnv } from "@/lib/env";
+import { issueVoiceGrant, reconcilePendingVoiceSession, voiceSessionControl } from "@/lib/coaching/session-lifecycle";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { DynamicVariables } from "@/types/domain";
 
@@ -22,9 +22,6 @@ const schema = z.object({
 });
 
 const listText = (value: unknown) => Array.isArray(value) ? value.filter((item): item is string => typeof item === "string").slice(0, 5).join(", ") : "";
-const SESSION_START_LIMIT_PER_HOUR = 10;
-const CREATED_SESSION_TIMEOUT_MS = 15 * 60 * 1000;
-const ACTIVE_SESSION_TIMEOUT_MS = 4 * 60 * 60 * 1000;
 
 export async function POST(request: Request) {
   try {
@@ -34,29 +31,9 @@ export async function POST(request: Request) {
     if (input.consentVersion !== expectedConsent) throw new ApiError(400, "Die Einwilligungsversion ist nicht aktuell.", "invalid_consent");
     const supabase = createAdminClient();
 
-    const now = Date.now();
-    const [{ error: staleCreatedError }, { error: staleActiveError }] = await Promise.all([
-      supabase.from("coaching_sessions").update({
-        status: "failed", processing_error: "Session wurde nicht innerhalb von 15 Minuten gestartet.",
-      }).eq("user_id", user.id).eq("status", "created").lt("created_at", new Date(now - CREATED_SESSION_TIMEOUT_MS).toISOString()),
-      supabase.from("coaching_sessions").update({
-        status: "failed", processing_error: "Aktive Session hat das Zeitlimit überschritten.",
-      }).eq("user_id", user.id).eq("status", "active").lt("created_at", new Date(now - ACTIVE_SESSION_TIMEOUT_MS).toISOString()),
-    ]);
-    if (staleCreatedError || staleActiveError) throw new ApiError(500, "Der Session-Status konnte nicht geprüft werden.", "session_state_check_failed");
+    await reconcilePendingVoiceSession(supabase, user.id);
 
-    const hourlyWindowStart = new Date(now - 60 * 60 * 1000).toISOString();
-    const [{ data: openSession, error: openSessionError }, { count: recentStartCount, error: rateLimitError }] = await Promise.all([
-      supabase.from("coaching_sessions").select("id").eq("user_id", user.id).in("status", ["created", "active"]).limit(1).maybeSingle(),
-      supabase.from("coaching_sessions").select("id", { count: "exact", head: true }).eq("user_id", user.id).gte("created_at", hourlyWindowStart),
-    ]);
-    if (openSessionError || rateLimitError) throw new ApiError(500, "Das Session-Limit konnte nicht geprüft werden.", "session_limit_check_failed");
-    if (openSession) throw new ApiError(409, "Es ist bereits eine Voice-Session geöffnet.", "session_already_open");
-    if ((recentStartCount ?? 0) >= SESSION_START_LIMIT_PER_HOUR) {
-      throw new ApiError(429, "Das stündliche Session-Limit ist erreicht. Bitte versuche es später erneut.", "session_rate_limited");
-    }
-
-    const [{ data: scenario }, { data: versions }] = await Promise.all([
+    const [{ data: scenario, error: scenarioError }, { data: versions, error: versionsError }] = await Promise.all([
       supabase.from("scenarios")
         .select("id,slug,title,description,agent_config,is_active,is_user_selectable,training_type_id,training_type:training_types(id,name,is_active)")
         .eq("id", input.scenarioId)
@@ -67,6 +44,7 @@ export async function POST(request: Request) {
         .select("id,elevenlabs_agent_id,elevenlabs_branch_id,version_number,is_active")
         .eq("training_type_id", input.trainingTypeId),
     ]);
+    if (scenarioError || versionsError) throw new ApiError(503, "Die Trainingskonfiguration konnte nicht gelesen werden.", "training_read_failed");
     const trainingType = Array.isArray(scenario?.training_type) ? scenario?.training_type[0] : scenario?.training_type;
     if (!scenario || !scenario.is_active || !scenario.is_user_selectable || !trainingType?.is_active) throw new ApiError(404, "Das gewählte Szenario ist nicht verfügbar.", "scenario_unavailable");
 
@@ -86,7 +64,8 @@ export async function POST(request: Request) {
     }
     const conversationOccasion = occasionResolution.value;
 
-    const [{ data: learning }, { data: recent }, { data: profile }, { data: criteria, error: criteriaError }] = await Promise.all([
+    const [{ data: learning, error: learningError }, { data: recent, error: recentError },
+      { data: profile, error: profileError }, { data: criteria, error: criteriaError }] = await Promise.all([
       supabase.from("learning_profiles").select("training_type_id,strengths,focus_areas,next_learning_goal").eq("user_id", user.id),
       supabase.from("coaching_sessions").select("summary,completed_at").eq("user_id", user.id).eq("status", "completed")
         .in("training_type_version_id", typeVersionIds).not("summary", "is", null)
@@ -94,7 +73,8 @@ export async function POST(request: Request) {
       supabase.from("profiles").select("display_name").eq("id", user.id).single(),
       supabase.from("evaluation_criteria").select("id,name,sort_order").eq("training_type_id", input.trainingTypeId).eq("is_active", true).order("sort_order"),
     ]);
-    if (criteriaError || !criteria?.length) throw new ApiError(409, "Für diese Trainingsart sind keine Schwerpunkte konfiguriert.", "criteria_unavailable");
+    if (learningError || recentError || profileError || criteriaError) throw new ApiError(503, "Die Trainingsdaten konnten nicht gelesen werden.", "training_context_read_failed");
+    if (!criteria?.length) throw new ApiError(409, "Für diese Trainingsart sind keine Schwerpunkte konfiguriert.", "criteria_unavailable");
     const selectedCriterion = input.mode === "focus" ? criteria.find((criterion) => criterion.id === input.focusCriterionId) : null;
     if (input.mode === "focus" && !selectedCriterion) throw new ApiError(400, "Der gewählte Trainingsschwerpunkt ist nicht verfügbar.", "invalid_focus");
     const globalProfile = (learning ?? []).find((item) => item.training_type_id === null);
@@ -127,34 +107,34 @@ export async function POST(request: Request) {
       available_training_focuses: criteria.map((criterion) => criterion.name).join(", "),
     };
 
-    const { data: session, error: insertError } = await supabase.from("coaching_sessions").insert({
-      user_id: user.id,
-      training_type_version_id: version.id,
-      scenario_id: scenario.id,
-      status: "created",
-      consent_version: input.consentVersion,
-      consented_at: new Date().toISOString(),
-      scenario_snapshot: {
+    const { data: reservation, error: reserveError } = await supabase.rpc("reserve_voice_session", {
+      p_user_id: user.id,
+      p_version_id: version.id,
+      p_scenario_id: scenario.id,
+      p_consent_version: input.consentVersion,
+      p_snapshot: {
         id: scenario.id, title: scenario.title, description: scenario.description,
         agentConfig: scenario.agent_config, trainingType: trainingType.name, agentVersion: version.version_number,
         conversationOccasion,
         mode: input.mode, focusCriterionId: selectedCriterion?.id ?? null, focusCriterionName: selectedCriterion?.name ?? null,
       },
-    }).select("id").single();
-    if (insertError?.code === "23505") throw new ApiError(409, "Es ist bereits eine Voice-Session geöffnet.", "session_already_open");
-    if (insertError || !session) throw new ApiError(500, "Die Session konnte nicht vorbereitet werden.");
-
-    const query = new URLSearchParams({ agent_id: version.elevenlabs_agent_id });
-    if (version.elevenlabs_branch_id) query.set("branch_id", version.elevenlabs_branch_id);
-    const signedResponse = await fetch(`https://api.elevenlabs.io/v1/convai/conversation/get-signed-url?${query}`, {
-      headers: { "xi-api-key": requireServerEnv("ELEVENLABS_API_KEY") }, cache: "no-store",
     });
-    if (!signedResponse.ok) {
-      await supabase.from("coaching_sessions").update({ status: "failed", processing_error: `Signed URL request failed (${signedResponse.status})` }).eq("id", session.id);
-      throw new ApiError(502, "Der Voice Agent ist vorübergehend nicht erreichbar.", "voice_provider_error");
+    if (reserveError || !reservation) throw new ApiError(503, "Die Session konnte nicht vorbereitet werden.", "session_reserve_failed");
+    if (reservation.code === "session_rate_limited") throw new ApiError(429, "Das stündliche Session-Limit ist erreicht.", reservation.code);
+    if (reservation.code === "session_already_open") throw new ApiError(409, "Die bisherige Voice-Verbindung ist noch nicht sicher beendet. Bitte lege auf und versuche es danach erneut.", reservation.code);
+    if (reservation.code !== "reserved" || typeof reservation.session_id !== "string") throw new ApiError(409, "Die Session kann derzeit nicht gestartet werden.", "session_reserve_conflict");
+
+    const sessionId = reservation.session_id;
+    try {
+      const grant = await issueVoiceGrant(version.elevenlabs_agent_id, version.elevenlabs_branch_id);
+      const issued = await voiceSessionControl(supabase, "issue", user.id, sessionId, grant.conversationId);
+      if (issued?.code !== "issued") throw new ApiError(409, "Die Session-Vorbereitung ist nicht mehr gültig.", "session_conflict");
+      return NextResponse.json({ sessionId, signedUrl: grant.signedUrl, dynamicVariables });
+    } catch (error) {
+      // This transition only closes an unissued preparation, never an active grant.
+      await voiceSessionControl(supabase, "fail_preparation", user.id, sessionId);
+      throw error;
     }
-    const signed = z.object({ signed_url: z.url() }).parse(await signedResponse.json());
-    return NextResponse.json({ sessionId: session.id, signedUrl: signed.signed_url, dynamicVariables });
   } catch (error) {
     return apiErrorResponse(error);
   }

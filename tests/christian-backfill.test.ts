@@ -6,7 +6,7 @@ const script = readFileSync(join(process.cwd(), "scripts/backfill-christian-2026
 
 describe("Christian sessions backfill", () => {
   it("targets exactly three approved sessions and sixteen category improvements", () => {
-    expect(script.match(/"[\da-f]{8}-[\da-f-]{27}": \{\n    summary:/g)).toHaveLength(3);
+    expect(script.match(/"[\da-f]{8}-[\da-f-]{27}": \{\r?\n    summary:/g)).toHaveLength(3);
     expect(script.match(/criterionId:/g)).toHaveLength(17);
     expect(script).toContain("if (improvementCount !== 16)");
   });

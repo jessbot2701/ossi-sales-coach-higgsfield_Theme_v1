@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useAppConversation } from "@/components/app-conversation-provider";
 import { OssiPortrait } from "@/components/ossi-portrait";
 import { CUSTOM_CONVERSATION_OCCASION_SLUG, MAX_CONVERSATION_OCCASION_LENGTH } from "@/lib/conversation-occasion";
 import type { DynamicVariables } from "@/types/domain";
+import { abortPreparedVoiceSession, startManagedVoiceSession } from "@/lib/coaching/voice-session-client";
 
 type TrainingMode = "surprise" | "focus";
 type TrainingType = { id: string; name: string; description: string };
@@ -64,6 +65,18 @@ function Launcher({ trainingTypes, scenarios, criteria, learningProfiles, consen
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [preparing, setPreparing] = useState(false);
+  const starting = useRef(false);
+  const mounted = useRef(true);
+  const preparation = useRef<AbortController | null>(null);
+  const lifecycle = useRef<ReturnType<typeof startManagedVoiceSession> | null>(null);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      preparation.current?.abort();
+      void lifecycle.current?.dispose();
+    };
+  }, []);
   const [consent, setConsent] = useState(false);
   const filteredScenarios = scenarios.filter((scenario) => scenario.training_type_id === trainingTypeId);
   const filteredCriteria = criteria.filter((criterion) => criterion.training_type_id === trainingTypeId);
@@ -85,13 +98,20 @@ function Launcher({ trainingTypes, scenarios, criteria, learningProfiles, consen
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setError(null); setMessage(null); setPreparing(true);
+    event.preventDefault();
+    if (starting.current || isLocked) return;
+    starting.current = true;
+    const controller = new AbortController();
+    preparation.current = controller;
+    setError(null); setMessage(null); setPreparing(true);
     try {
       const permission = await navigator.mediaDevices.getUserMedia({ audio: true });
       permission.getTracks().forEach((track) => track.stop());
+      if (!mounted.current || controller.signal.aborted) return;
       const response = await fetch("/api/sessions/start", {
         method: "POST",
         headers: { "content-type": "application/json" },
+        signal: AbortSignal.any([controller.signal, AbortSignal.timeout(30_000)]),
         body: JSON.stringify({
           trainingTypeId,
           scenarioId,
@@ -104,23 +124,37 @@ function Launcher({ trainingTypes, scenarios, criteria, learningProfiles, consen
       });
       const result = await response.json() as { sessionId?: string; signedUrl?: string; dynamicVariables?: DynamicVariables; error?: string };
       if (!response.ok || !result.sessionId || !result.signedUrl || !result.dynamicVariables) throw new Error(result.error || "Session konnte nicht gestartet werden.");
+      if (!mounted.current || controller.signal.aborted) {
+        await abortPreparedVoiceSession(result.sessionId);
+        return;
+      }
       setSessionId(result.sessionId);
-      const preparedSessionId = result.sessionId;
-      startSession({
+      lifecycle.current = startManagedVoiceSession({
+        sessionId: result.sessionId,
         signedUrl: result.signedUrl,
-        connectionType: "websocket",
         dynamicVariables: result.dynamicVariables,
-        onConnect: async ({ conversationId }) => {
-          const bind = await fetch(`/api/sessions/${preparedSessionId}/bind`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ conversationId }) });
-          if (!bind.ok) { await endSession(); setError("Die Voice-Verbindung konnte nicht sicher zugeordnet werden."); }
-          else setMessage("Ossi hört zu. Viel Erfolg!");
+        startSession, endSession,
+        onReady: () => {
+          if (!mounted.current) return;
+          setPreparing(false);
+          setMessage("Ossi hört zu. Viel Erfolg!");
         },
-        onDisconnect: () => setMessage("Gespräch beendet. Die Auswertung wird verarbeitet."),
-        onError: (providerError) => setError(typeof providerError === "string" ? providerError : "Die Voice-Verbindung wurde unterbrochen."),
+        onEnded: () => {
+          if (!mounted.current) return;
+          starting.current = false; setPreparing(false);
+          setMessage("Gespräch beendet. Die Auswertung wird verarbeitet.");
+        },
+        onFailure: (message) => {
+          if (!mounted.current) return;
+          starting.current = false; setPreparing(false);
+          setMessage(null); setError(message);
+        },
       });
     } catch (caught) {
+      if (!mounted.current) return;
+      starting.current = false; setPreparing(false);
       setError(caught instanceof Error ? caught.message : "Session konnte nicht gestartet werden.");
-    } finally { setPreparing(false); }
+    }
   }
 
   return (

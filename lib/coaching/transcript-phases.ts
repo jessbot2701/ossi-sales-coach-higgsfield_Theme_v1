@@ -2,7 +2,7 @@ export const ROLEPLAY_START_MARKER = "Rollenspiel beginnt.";
 export const ROLEPLAY_END_MARKER = "Rollenspiel beendet – zurück im Coach-Modus.";
 
 export type TranscriptPhase = "coach_intro" | "roleplay" | "coach_debrief";
-export type TranscriptBoundaryStatus = "recognized" | "missing" | "ambiguous";
+export type TranscriptBoundaryStatus = "recognized" | "partial" | "missing" | "ambiguous";
 
 export type TranscriptTurn = {
   role?: string;
@@ -79,9 +79,8 @@ function legacyStartBoundaries(transcript: TranscriptTurn[]): Boundary[] {
   return [...byTurn.values()].sort((a, b) => a.turnIndex - b.turnIndex);
 }
 
-function isBeforeOrEqual(left: Boundary, right: Boundary) {
-  return left.turnIndex < right.turnIndex
-    || (left.turnIndex === right.turnIndex && left.end <= right.start);
+export function hasEvaluableRoleplay(analysis: TranscriptPhaseAnalysis) {
+  return analysis.status === "recognized" || analysis.status === "partial";
 }
 
 function slicePhase(
@@ -101,44 +100,33 @@ function slicePhase(
 
 function recognizedSegments(
   transcript: TranscriptTurn[],
-  startBoundary: Boundary,
-  endBoundary: Boundary,
+  intervals: { start: Boundary; end: Boundary }[],
 ) {
+  const transitions = intervals.flatMap(({ start, end }) => [
+    { turnIndex: start.turnIndex, offset: start.end, phase: "roleplay" as const },
+    { turnIndex: end.turnIndex, offset: end.start, phase: "coach_debrief" as const },
+  ]);
+  let phase: TranscriptPhase = "coach_intro";
+  let transitionIndex = 0;
+
   return transcript.flatMap((turn, turnIndex) => {
     const messageLength = typeof turn.message === "string" ? turn.message.length : 0;
-
-    if (turnIndex < startBoundary.turnIndex) {
-      return slicePhase(turn, turnIndex, 0, messageLength, "coach_intro");
+    const segments: TranscriptSegment[] = [];
+    let cursor = 0;
+    while (transitions[transitionIndex]?.turnIndex === turnIndex) {
+      const transition = transitions[transitionIndex++];
+      segments.push(...slicePhase(turn, turnIndex, cursor, transition.offset, phase));
+      cursor = transition.offset;
+      phase = transition.phase;
     }
-    if (turnIndex > endBoundary.turnIndex) {
-      return slicePhase(turn, turnIndex, 0, messageLength, "coach_debrief");
-    }
-    if (startBoundary.turnIndex === endBoundary.turnIndex && turnIndex === startBoundary.turnIndex) {
-      return [
-        ...slicePhase(turn, turnIndex, 0, startBoundary.end, "coach_intro"),
-        ...slicePhase(turn, turnIndex, startBoundary.end, endBoundary.start, "roleplay"),
-        ...slicePhase(turn, turnIndex, endBoundary.start, messageLength, "coach_debrief"),
-      ];
-    }
-    if (turnIndex === startBoundary.turnIndex) {
-      return [
-        ...slicePhase(turn, turnIndex, 0, startBoundary.end, "coach_intro"),
-        ...slicePhase(turn, turnIndex, startBoundary.end, messageLength, "roleplay"),
-      ];
-    }
-    if (turnIndex === endBoundary.turnIndex) {
-      return [
-        ...slicePhase(turn, turnIndex, 0, endBoundary.start, "roleplay"),
-        ...slicePhase(turn, turnIndex, endBoundary.start, messageLength, "coach_debrief"),
-      ];
-    }
-    return slicePhase(turn, turnIndex, 0, messageLength, "roleplay");
+    segments.push(...slicePhase(turn, turnIndex, cursor, messageLength, phase));
+    return segments;
   });
 }
 
 function unresolvedAnalysis(
   transcript: TranscriptTurn[],
-  status: Exclude<TranscriptBoundaryStatus, "recognized">,
+  status: "missing" | "ambiguous",
   reason: string,
 ): TranscriptPhaseAnalysis {
   const segments = transcript.flatMap((turn, turnIndex) => {
@@ -152,42 +140,59 @@ export function analyzeTranscriptPhases(
   transcript: TranscriptTurn[],
 ): TranscriptPhaseAnalysis {
   const exactStarts = matchesForPattern(transcript, EXACT_START_PATTERN);
-  const starts = exactStarts.length > 0
-    ? exactStarts
-    : legacyStartBoundaries(transcript);
+  // A later exercise may use legacy wording even when an earlier one used an
+  // exact marker. In a mixed turn the exact marker remains authoritative.
+  const exactStartTurns = new Set(exactStarts.map((boundary) => boundary.turnIndex));
+  const starts = [
+    ...exactStarts,
+    ...legacyStartBoundaries(transcript).filter((boundary) => !exactStartTurns.has(boundary.turnIndex)),
+  ];
   const ends = matchesForPattern(transcript, END_PATTERN);
+  const boundaries = [
+    ...starts.map((boundary) => ({ ...boundary, kind: "start" as const })),
+    ...ends.map((boundary) => ({ ...boundary, kind: "end" as const })),
+  ].sort((a, b) => a.turnIndex - b.turnIndex || a.start - b.start);
+  const intervals: { start: Boundary; end: Boundary }[] = [];
+  let open: { boundary: Boundary; valid: boolean } | null = null;
+  let malformed = false;
 
-  if (starts.length === 0 || ends.length === 0) {
-    return unresolvedAnalysis(
-      transcript,
-      "missing",
-      starts.length === 0
-        ? "Kein sicherer Rollenspiel-Startmarker gefunden."
-        : "Kein sicherer Rollenspiel-Endmarker gefunden.",
-    );
-  }
-  if (starts.length !== 1 || ends.length !== 1) {
-    return unresolvedAnalysis(
-      transcript,
-      "ambiguous",
-      "Rollenspiel-Grenzen sind mehrfach oder widersprüchlich markiert.",
-    );
-  }
-
-  const [startBoundary] = starts;
-  const [endBoundary] = ends;
-  if (!isBeforeOrEqual(startBoundary, endBoundary)) {
-    return unresolvedAnalysis(
-      transcript,
-      "ambiguous",
-      "Der Rollenspiel-Endmarker liegt nicht nach dem Startmarker.",
-    );
+  for (const boundary of boundaries) {
+    if (boundary.kind === "start") {
+      if (open) {
+        // Nested starts make the entire open exercise unsafe, including text
+        // before the second start. Resume only after an explicit end.
+        open.valid = false;
+        malformed = true;
+      } else {
+        open = { boundary, valid: true };
+      }
+    } else if (open) {
+      if (open.valid) intervals.push({ start: open.boundary, end: boundary });
+      open = null;
+    } else {
+      malformed = true;
+    }
   }
 
-  const segments = recognizedSegments(transcript, startBoundary, endBoundary);
+  if (!intervals.length) {
+    return unresolvedAnalysis(
+      transcript,
+      malformed ? "ambiguous" : "missing",
+      malformed
+        ? "Rollenspiel-Grenzen sind widersprüchlich markiert."
+        : starts.length === 0
+          ? "Kein sicherer Rollenspiel-Startmarker gefunden."
+          : "Kein sicherer Rollenspiel-Endmarker gefunden.",
+    );
+  }
+
+  const partial = malformed || open !== null;
+  const segments = recognizedSegments(transcript, intervals);
   return {
-    status: "recognized",
-    reason: null,
+    status: partial ? "partial" : "recognized",
+    reason: partial
+      ? "Nur vollständig abgeschlossene, eindeutige Rollenspielabschnitte sind auswertbar."
+      : null,
     segments,
     roleplayUserMessages: segments
       .filter((segment) => segment.phase === "roleplay" && segment.role === "user")
